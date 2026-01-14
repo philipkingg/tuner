@@ -1,15 +1,50 @@
-# Uncomment the next line to define a global platform for your project
-# platform :ios, '9.0'
+# Set the platform to 13.0 for the record package
+platform :ios, '13.0'
+
+# --- FLUTTER BOILERPLATE START ---
+def flutter_root
+  generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
+  unless File.exist?(generated_xcode_build_settings_path)
+    raise "Generated.xcconfig must exist. Run 'flutter pub get' first."
+  end
+
+  File.foreach(generated_xcode_build_settings_path) do |line|
+    matches = line.match(/FLUTTER_ROOT\=(.*)/)
+    return matches[1].strip if matches
+  end
+  raise "FLUTTER_ROOT not found in Generated.xcconfig. Try deleting Generated.xcconfig and run 'flutter pub get'"
+end
+
+require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+
+flutter_ios_podfile_setup
+# --- FLUTTER BOILERPLATE END ---
 
 target 'Runner' do
-  # Comment the next line if you don't want to use dynamic frameworks
   use_frameworks!
+  use_modular_headers!
 
-  # Pods for Runner
+  # This line installs the plugins (record, permission_handler, etc.)
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 
   target 'RunnerTests' do
     inherit! :search_paths
-    # Pods for testing
   end
+end
 
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+
+    target.build_configurations.each do |config|
+      # Fix for M3 Mac architecture mismatch
+      config.build_settings["EXCLUDED_ARCHS[sdk=iphonesimulator*]"] = "arm64"
+
+      # Your Permission Handler logic
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
+        '$(inherited)',
+        'PERMISSION_MICROPHONE=1',
+      ]
+    end
+  end
 end
