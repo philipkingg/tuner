@@ -6,11 +6,11 @@
 	<dict>
 		<key>Headers/Flutter.h</key>
 		<data>
-		wTPJHICwW6wxY3b87ek7ITN5kJk=
+		dQsuFiftv2fxtixhcMIA/+B+uUM=
 		</data>
 		<key>Headers/FlutterAppDelegate.h</key>
 		<data>
-		zbvYFr9dywry0lMMrHuNOOaNgkY=
+		PfJCf6hbYTWm910ECDC5roRPfWE=
 		</data>
 		<key>Headers/FlutterBinaryMessenger.h</key>
 		<data>
@@ -34,7 +34,7 @@
 		</data>
 		<key>Headers/FlutterEngine.h</key>
 		<data>
-		AqVvCbPmgWMQKrRnib05Okrjbp0=
+		BFan2MPs+CkI3+ihxkbJDuKQ7a0=
 		</data>
 		<key>Headers/FlutterEngineGroup.h</key>
 		<data>
@@ -54,15 +54,23 @@
 		</data>
 		<key>Headers/FlutterPlatformViews.h</key>
 		<data>
-		ocQVSiAiUMYfVtZIn48LpYTJA5w=
+		hAwPmAERwlkwVd6RZpc09UHL50I=
 		</data>
 		<key>Headers/FlutterPlugin.h</key>
 		<data>
-		EARXud6pHb7ZYP8eXPDnluMqcXk=
+		REG3r2IMfvEjtswwALvyVHTQhjo=
 		</data>
 		<key>Headers/FlutterPluginAppLifeCycleDelegate.h</key>
 		<data>
 		qWHw5VIWEa0NmJ1PMhD16nlfRKk=
+		</data>
+		<key>Headers/FlutterSceneDelegate.h</key>
+		<data>
+		1YaIV2MTzs0X0U13jT89+5nUoL8=
+		</data>
+		<key>Headers/FlutterSceneLifeCycle.h</key>
+		<data>
+		IqEbKnMthck20540eNZgrlrLvJE=
 		</data>
 		<key>Headers/FlutterTexture.h</key>
 		<data>
@@ -74,7 +82,7 @@
 		</data>
 		<key>Info.plist</key>
 		<data>
-		+8GUTjT65EWKWGCvzzqxpU7xZPE=
+		k4dNn2yFYH1VBFHBtHKMaLCPM7s=
 		</data>
 		<key>Modules/module.modulemap</key>
 		<data>
@@ -95,14 +103,14 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			auaf7wPxiASCYD2ACy1dfbMJvmONwFvSz1BWYAQrrSw=
+			wfWyagPYLCRR2+wTuGRbtW3z3z2AWS+YFxuiBOFdSjY=
 			</data>
 		</dict>
 		<key>Headers/FlutterAppDelegate.h</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			o0iigVsmgwmtZfSv3X7hReDNYP5rXblslDnqq2s6UQc=
+			ehumZ2VCA9xOXBI/7gQunPmAgn9cJpiZKDS9p8XWqkY=
 			</data>
 		</dict>
 		<key>Headers/FlutterBinaryMessenger.h</key>
@@ -144,7 +152,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			RAOC6nDhZdghbAzsIZgVeq6qPt+MUNTfm/vkUnhmZO4=
+			QwvtJ2TkMcRYqWJ9V4J3LToKMLVK1pOcJpQtnIdnA+s=
 			</data>
 		</dict>
 		<key>Headers/FlutterEngineGroup.h</key>
@@ -179,14 +187,14 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			4hl+kRU4PNNKdAHvYrliObXzSjRzow9Z18oOMRZIa0o=
+			0aU9uM6QcpzmZpuFYObj9dGlGEkTKowPMERJQQdF2P4=
 			</data>
 		</dict>
 		<key>Headers/FlutterPlugin.h</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			HqbvCHqKWTzs5GjLAwupqEIYVi9yf5CrMdMe31EOwUA=
+			QcjhOhk5cb1U7bmyQh9TnFm1M2Tgv82RSSbJ6OIdMr4=
 			</data>
 		</dict>
 		<key>Headers/FlutterPluginAppLifeCycleDelegate.h</key>
@@ -194,6 +202,20 @@
 			<key>hash2</key>
 			<data>
 			+PMn+5SDj2Vd6RU8CQIt/JYl3T+8Dhp7HImqAzocoNk=
+			</data>
+		</dict>
+		<key>Headers/FlutterSceneDelegate.h</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			G9urZeE312ldazkeP/7sut0t2hA3lfcuxHRSuLmj+gY=
+			</data>
+		</dict>
+		<key>Headers/FlutterSceneLifeCycle.h</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			nvPq1KiXUwgQ/TtOSqHisNHQPvnVpvtXi3L0zLchdyI=
 			</data>
 		</dict>
 		<key>Headers/FlutterTexture.h</key>
