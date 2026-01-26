@@ -295,6 +295,7 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
     );
   }
 
+  // Update your _showSettings method to this context-aware version:
   void _showSettings() {
     showModalBottomSheet(
       context: context,
@@ -323,22 +324,40 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
                 },
               ),
               const SizedBox(height: 16),
-              _settingLabel("Base Zoom", pianoRollZoom.toStringAsFixed(1)),
-              Slider(value: pianoRollZoom, min: 0.2, max: 2.0, onChanged: (v) {
-                setModalState(() => pianoRollZoom = v);
-                setState(() => pianoRollZoom = v);
-                _saveSettings();
-              }),
-              _settingLabel("Trace Glide", traceLerpFactor.toStringAsFixed(2)),
-              Slider(value: traceLerpFactor, min: 0.01, max: 0.5, onChanged: (v) {
-                setModalState(() => traceLerpFactor = v);
-                setState(() => traceLerpFactor = v);
-                _saveSettings();
-              }),
+
+              // CONTEXT-AWARE SETTINGS: Only show Roll settings if in Roll mode
+              if (_visualMode == VisualMode.rollingTrace) ...[
+                _settingLabel("Base Zoom", pianoRollZoom.toStringAsFixed(1)),
+                Slider(value: pianoRollZoom, min: 0.2, max: 2.0, onChanged: (v) {
+                  setModalState(() => pianoRollZoom = v);
+                  setState(() => pianoRollZoom = v);
+                  _saveSettings();
+                }),
+                _settingLabel("Trace Glide", traceLerpFactor.toStringAsFixed(2)),
+                Slider(value: traceLerpFactor, min: 0.01, max: 0.5, onChanged: (v) {
+                  setModalState(() => traceLerpFactor = v);
+                  setState(() => traceLerpFactor = v);
+                  _saveSettings();
+                }),
+              ],
+
+              // Shared settings
               _settingLabel("Needle Speed", "${smoothingSpeed.toInt()}ms"),
               Slider(value: smoothingSpeed, min: 50, max: 500, onChanged: (v) {
                 setModalState(() => smoothingSpeed = v);
                 setState(() => smoothingSpeed = v);
+                _saveSettings();
+              }),
+              _settingLabel("Max Audio Gain", targetGain.toStringAsFixed(1)),
+              Slider(value: targetGain, min: 1.0, max: 20.0, onChanged: (v) {
+                setModalState(() => targetGain = v);
+                setState(() => targetGain = v);
+                _saveSettings();
+              }),
+              _settingLabel("Pitch Sensitivity", sensitivity.toStringAsFixed(2)),
+              Slider(value: sensitivity, min: 0.1, max: 0.9, onChanged: (v) {
+                setModalState(() => sensitivity = v);
+                setState(() => sensitivity = v);
                 _saveSettings();
               }),
               const SizedBox(height: 24),
@@ -370,7 +389,7 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        leadingWidth: 120, // Increased width for the text
+        leadingWidth: 140,
         leading: InkWell(
           onTap: _showTuningMenu,
           child: Padding(
@@ -387,11 +406,57 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
         actions: [IconButton(onPressed: _showSettings, icon: const Icon(Icons.settings))],
       ),
       body: Column(children: [
-        RichText(text: TextSpan(children: [
-          TextSpan(text: note, style: TextStyle(fontSize: 100, fontWeight: FontWeight.bold, color: isCorrect ? Colors.green : Colors.white)),
-          TextSpan(text: octave, style: TextStyle(fontSize: 30, color: Colors.blueAccent.withOpacity(0.7), fontFeatures: const [FontFeature.subscripts()])),
-        ])),
+        // FIXED HEIGHT CONTAINER TO PREVENT SHIFTING
+        SizedBox(
+          height: 180, // Fixed height for the note area
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Glow layer - uses Positioned.fill so it doesn't affect layout
+              if (isCorrect)
+                IgnorePointer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          Colors.greenAccent.withOpacity(0.4),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              // Text layer
+              Center(
+                child: RichText(
+                  text: TextSpan(children: [
+                    TextSpan(
+                      text: note,
+                      style: TextStyle(
+                        fontSize: 100,
+                        fontWeight: FontWeight.bold,
+                        color: isCorrect ? Colors.greenAccent : Colors.white,
+                        shadows: isCorrect ? [const Shadow(blurRadius: 20, color: Colors.greenAccent)] : null,
+                      ),
+                    ),
+                    TextSpan(
+                      text: octave,
+                      style: TextStyle(
+                        fontSize: 30,
+                        color: Colors.blueAccent.withOpacity(0.7),
+                        fontFeatures: const [FontFeature.subscripts()],
+                      ),
+                    ),
+                  ]),
+                ),
+              ),
+            ],
+          ),
+        ),
+
         Text("${hz.toStringAsFixed(1)} Hz", style: const TextStyle(fontSize: 20, color: Colors.blueAccent)),
+
         Expanded(
           child: Container(
             margin: const EdgeInsets.symmetric(vertical: 20),
@@ -408,7 +473,7 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
           child: Column(children: [
             SizedBox(height: 40, width: double.infinity, child: CustomPaint(painter: CentsMeterPainter(cents.toDouble()))),
             const SizedBox(height: 10),
-            Text("${cents.abs()} cents ${cents > 0 ? 'sharp' : 'flat'}", style: TextStyle(fontSize: 16, color: isCorrect ? Colors.green : Colors.white70)),
+            Text("${cents.abs()} cents ${cents > 0 ? 'sharp' : 'flat'}", style: TextStyle(fontSize: 16, color: isCorrect ? Colors.greenAccent : Colors.white70)),
           ]),
         ),
       ]),
@@ -449,18 +514,25 @@ class RollingRollPainter extends CustomPainter {
     return (noteNames.indexOf(match.group(1)!) + (int.parse(match.group(2)!) * 12)) - 57.0;
   }
 
+  // Restored Color Blending Logic
+  Color _getColor(double cents) {
+    double absCents = cents.abs();
+    if (absCents < 5) return Colors.greenAccent;
+    if (absCents < 20) return Color.lerp(Colors.greenAccent, Colors.yellowAccent, (absCents - 5) / 15)!;
+    return Color.lerp(Colors.yellowAccent, Colors.redAccent, ((absCents - 20) / 30).clamp(0.0, 1.0))!;
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     final double midX = size.width / 2;
     final double stepX = (size.width / 2) * zoom;
     final double drawingHeight = size.height - 40.0;
 
-    // Draw Grid with larger visibility padding for zooming
+    // Draw Grid
     if (filteredNotes.isEmpty) {
       int range = (3 / zoom).ceil().clamp(3, 24);
       int startN = (centerNoteIndex - range).floor();
       int endN = (centerNoteIndex + range).ceil();
-
       for (int n = startN; n <= endN; n++) {
         _drawSingleLine(canvas, n.toDouble(), midX, stepX, drawingHeight);
       }
@@ -471,13 +543,25 @@ class RollingRollPainter extends CustomPainter {
     }
 
     if (history.isEmpty) return;
-    final path = Path();
-    for (int i = 0; i < history.length; i++) {
-      double xPos = midX + ((history[i].y - centerNoteIndex) * stepX);
-      double yPos = drawingHeight - (i * (drawingHeight / 120));
-      if (i == 0) path.moveTo(xPos, yPos); else path.lineTo(xPos, yPos);
+
+    // Draw the multi-colored path
+    final Paint linePaint = Paint()
+      ..strokeWidth = 3.5
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    // We draw segments to allow the color to change along the line
+    for (int i = 0; i < history.length - 1; i++) {
+      double x1 = midX + ((history[i].y - centerNoteIndex) * stepX);
+      double y1 = drawingHeight - (i * (drawingHeight / 120));
+      double x2 = midX + ((history[i+1].y - centerNoteIndex) * stepX);
+      double y2 = drawingHeight - ((i + 1) * (drawingHeight / 120));
+
+      linePaint.color = _getColor(history[i].x);
+      canvas.drawLine(Offset(x1, y1), Offset(x2, y2), linePaint);
     }
-    canvas.drawPath(path, Paint()..color = Colors.blueAccent..strokeWidth = 3.5..style = PaintingStyle.stroke);
+
+    // Draw Center Guide Line
     canvas.drawLine(Offset(midX, 0), Offset(midX, drawingHeight), Paint()..color = Colors.white24..strokeWidth = 1.5);
   }
 
@@ -485,9 +569,16 @@ class RollingRollPainter extends CustomPainter {
     double xPos = midX + ((n - centerNoteIndex) * stepX);
     if (xPos < -80 || xPos > midX * 2 + 80) return;
     bool isActive = (n - centerNoteIndex).abs() < 0.2;
-    canvas.drawLine(Offset(xPos, 0), Offset(xPos, drawingHeight), Paint()..color = isActive ? Colors.blueAccent.withOpacity(0.6) : Colors.white.withOpacity(0.08)..strokeWidth = isActive ? 3 : 1);
-    String label = "${noteNames[((n + 57) % 12).toInt()]}${((n + 57) / 12).floor()}";
-    TextPainter(text: TextSpan(text: label, style: TextStyle(color: isActive ? Colors.blueAccent : Colors.white24, fontSize: isActive ? 14 : 11, fontWeight: FontWeight.bold)), textDirection: TextDirection.ltr)..layout()..paint(canvas, Offset(xPos - 8, drawingHeight + 5));
+    canvas.drawLine(Offset(xPos, 0), Offset(xPos, drawingHeight), Paint()
+      ..color = isActive ? Colors.blueAccent.withOpacity(0.6) : Colors.white.withOpacity(0.08)
+      ..strokeWidth = isActive ? 3 : 1);
+
+    int noteIdx = ((n + 57) % 12).toInt();
+    int oct = ((n + 57) / 12).floor();
+    String label = "${noteNames[noteIdx]}$oct";
+
+    TextPainter(text: TextSpan(text: label, style: TextStyle(color: isActive ? Colors.blueAccent : Colors.white24, fontSize: isActive ? 14 : 11, fontWeight: FontWeight.bold)), textDirection: TextDirection.ltr)
+      ..layout()..paint(canvas, Offset(xPos - 8, drawingHeight + 5));
   }
   @override bool shouldRepaint(RollingRollPainter old) => true;
 }
