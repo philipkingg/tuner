@@ -51,14 +51,22 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
   double _currentLerpedNote = 0.0;
   bool _isInitialized = false;
 
-  // Settings
-  VisualMode _visualMode = VisualMode.rollingTrace;
+  // Default Settings
+  static const VisualMode _defaultVisualMode = VisualMode.rollingTrace;
+  static const double _defaultTargetGain = 5.0;
+  static const double _defaultSensitivity = 0.4;
+  static const double _defaultSmoothingSpeed = 100.0;
+  static const double _defaultPianoRollZoom = 1.0;
+  static const double _defaultTraceLerpFactor = 0.15;
+
+  // Current Settings
+  VisualMode _visualMode = _defaultVisualMode;
   double gain = 1.0;
-  double targetGain = 5.0;
-  double sensitivity = 0.4;
-  double smoothingSpeed = 100.0;
-  double pianoRollZoom = 1.0;
-  double traceLerpFactor = 0.15;
+  double targetGain = _defaultTargetGain;
+  double sensitivity = _defaultSensitivity;
+  double smoothingSpeed = _defaultSmoothingSpeed;
+  double pianoRollZoom = _defaultPianoRollZoom;
+  double traceLerpFactor = _defaultTraceLerpFactor;
 
   @override
   void initState() {
@@ -81,12 +89,12 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
   void _loadSettings() {
     if (_prefs == null) return;
     setState(() {
-      _visualMode = VisualMode.values[_prefs!.getInt('visualMode') ?? 1];
-      targetGain = _prefs!.getDouble('targetGain') ?? 5.0;
-      sensitivity = _prefs!.getDouble('sensitivity') ?? 0.4;
-      smoothingSpeed = _prefs!.getDouble('smoothingSpeed') ?? 100.0;
-      pianoRollZoom = _prefs!.getDouble('pianoRollZoom') ?? 1.0;
-      traceLerpFactor = _prefs!.getDouble('traceLerpFactor') ?? 0.15;
+      _visualMode = VisualMode.values[_prefs!.getInt('visualMode') ?? _defaultVisualMode.index];
+      targetGain = _prefs!.getDouble('targetGain') ?? _defaultTargetGain;
+      sensitivity = _prefs!.getDouble('sensitivity') ?? _defaultSensitivity;
+      smoothingSpeed = _prefs!.getDouble('smoothingSpeed') ?? _defaultSmoothingSpeed;
+      pianoRollZoom = _prefs!.getDouble('pianoRollZoom') ?? _defaultPianoRollZoom;
+      traceLerpFactor = _prefs!.getDouble('traceLerpFactor') ?? _defaultTraceLerpFactor;
       gain = targetGain;
     });
   }
@@ -99,6 +107,19 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
     await _prefs!.setDouble('smoothingSpeed', smoothingSpeed);
     await _prefs!.setDouble('pianoRollZoom', pianoRollZoom);
     await _prefs!.setDouble('traceLerpFactor', traceLerpFactor);
+  }
+
+  void _resetToDefaults() {
+    setState(() {
+      _visualMode = _defaultVisualMode;
+      targetGain = _defaultTargetGain;
+      sensitivity = _defaultSensitivity;
+      smoothingSpeed = _defaultSmoothingSpeed;
+      pianoRollZoom = _defaultPianoRollZoom;
+      traceLerpFactor = _defaultTraceLerpFactor;
+      gain = targetGain;
+    });
+    _saveSettings();
   }
 
   Future<void> _startTuning() async {
@@ -239,6 +260,22 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
                 setState(() => sensitivity = v);
                 _saveSettings();
               }),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.tonalIcon(
+                  onPressed: () {
+                    _resetToDefaults();
+                    setModalState(() {}); // Refresh modal view
+                  },
+                  icon: const Icon(Icons.restore),
+                  label: const Text("Reset to Defaults"),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.redAccent.withOpacity(0.1),
+                    foregroundColor: Colors.redAccent,
+                  ),
+                ),
+              ),
             ]),
           ),
         ),
@@ -289,7 +326,6 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
           child: Column(children: [
-            // Custom Cents Meter replacing the standard slider
             SizedBox(
               height: 40,
               width: double.infinity,
@@ -314,23 +350,22 @@ class CentsMeterPainter extends CustomPainter {
     final double midX = size.width / 2;
     final double range = 50.0;
 
-    // Background Track
     canvas.drawLine(Offset(0, size.height / 2), Offset(size.width, size.height / 2),
         Paint()..color = Colors.white12..strokeWidth = 2);
 
-    // Tick marks
     final tickPaint = Paint()..color = Colors.white24..strokeWidth = 1;
     for (int i = -50; i <= 50; i += 10) {
       double x = midX + (i / range) * midX;
-      double h = i % 50 == 0 ? 15 : 8;
-      canvas.drawLine(Offset(x, (size.height / 2) - h/2), Offset(x, (size.height / 2) + h/2), tickPaint);
+      bool isCenter = i == 0;
+      double h = isCenter ? 20 : (i % 50 == 0 ? 15 : 8);
+
+      final p = isCenter ? (Paint()..color = Colors.white70..strokeWidth = 2) : tickPaint;
+      canvas.drawLine(Offset(x, (size.height / 2) - h/2), Offset(x, (size.height / 2) + h/2), p);
     }
 
-    // Needle Color Logic
     Color needleColor = _getNeedleColor(cents.abs());
-
-    // Needle (Vertical line)
     double needleX = midX + (cents.clamp(-50, 50) / range) * midX;
+
     canvas.drawLine(
         Offset(needleX, 0),
         Offset(needleX, size.height),
@@ -398,7 +433,6 @@ class RollingRollPainter extends CustomPainter {
       double xPos = midX + ((n - centerNoteIndex) * stepX);
       bool isActive = (n - centerNoteIndex).abs() < 0.2;
 
-      // Emphasize the active grid line
       final linePaint = Paint()
         ..color = isActive ? Colors.blueAccent.withOpacity(0.6) : Colors.white.withOpacity(0.08)
         ..strokeWidth = isActive ? 3 : 1;
@@ -421,7 +455,6 @@ class RollingRollPainter extends CustomPainter {
         textDirection: TextDirection.ltr,
       )..layout();
 
-      // CENTER ALIGNMENT: Subtract half width from xPos
       textPainter.paint(canvas, Offset(xPos - (textPainter.width / 2), drawingHeight + 5));
     }
   }
