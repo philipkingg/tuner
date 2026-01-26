@@ -188,56 +188,59 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) => Container(
           padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text("Tuner Settings", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-            const Divider(height: 32, color: Colors.white24),
-
-            const Text("Visual Mode", style: TextStyle(color: Colors.grey)),
-            const SizedBox(height: 8),
-            SegmentedButton<VisualMode>(
-              segments: const [
-                ButtonSegment(value: VisualMode.needle, label: Text("Wave"), icon: Icon(Icons.waves)),
-                ButtonSegment(value: VisualMode.rollingTrace, label: Text("Roll"), icon: Icon(Icons.linear_scale)),
+          child: SingleChildScrollView(
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text("Tuner Settings", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              const Divider(height: 32, color: Colors.white24),
+              const Text("Visual Mode", style: TextStyle(color: Colors.grey)),
+              const SizedBox(height: 8),
+              SegmentedButton<VisualMode>(
+                segments: const [
+                  ButtonSegment(value: VisualMode.needle, label: Text("Wave"), icon: Icon(Icons.waves)),
+                  ButtonSegment(value: VisualMode.rollingTrace, label: Text("Roll"), icon: Icon(Icons.linear_scale)),
+                ],
+                selected: {_visualMode},
+                onSelectionChanged: (val) {
+                  setModalState(() => _visualMode = val.first);
+                  setState(() => _visualMode = val.first);
+                  _saveSettings();
+                },
+              ),
+              const SizedBox(height: 16),
+              if (_visualMode == VisualMode.rollingTrace) ...[
+                _settingLabel("Zoom (Note Spacing)", pianoRollZoom.toStringAsFixed(1)),
+                Slider(value: pianoRollZoom, min: 0.2, max: 2.0, onChanged: (v) {
+                  setModalState(() => pianoRollZoom = v);
+                  setState(() => pianoRollZoom = v);
+                  _saveSettings();
+                }),
+                _settingLabel("Trace Glide", traceLerpFactor.toStringAsFixed(2)),
+                Slider(value: traceLerpFactor, min: 0.01, max: 0.5, onChanged: (v) {
+                  setModalState(() => traceLerpFactor = v);
+                  setState(() => traceLerpFactor = v);
+                  _saveSettings();
+                }),
               ],
-              selected: {_visualMode},
-              onSelectionChanged: (val) {
-                setModalState(() => _visualMode = val.first);
-                setState(() => _visualMode = val.first);
-                _saveSettings();
-              },
-            ),
-
-            const SizedBox(height: 16),
-
-            if (_visualMode == VisualMode.rollingTrace) ...[
-              _settingLabel("Zoom (Note Spacing)", pianoRollZoom.toStringAsFixed(1)),
-              Slider(value: pianoRollZoom, min: 0.2, max: 2.0, onChanged: (v) {
-                setModalState(() => pianoRollZoom = v);
-                setState(() => pianoRollZoom = v);
+              _settingLabel("Needle Speed", "${smoothingSpeed.toInt()}ms"),
+              Slider(value: smoothingSpeed, min: 50, max: 500, onChanged: (v) {
+                setModalState(() => smoothingSpeed = v);
+                setState(() => smoothingSpeed = v);
                 _saveSettings();
               }),
-              _settingLabel("Trace Glide", traceLerpFactor.toStringAsFixed(2)),
-              Slider(value: traceLerpFactor, min: 0.01, max: 0.5, onChanged: (v) {
-                setModalState(() => traceLerpFactor = v);
-                setState(() => traceLerpFactor = v);
+              _settingLabel("Max Audio Gain", targetGain.toStringAsFixed(1)),
+              Slider(value: targetGain, min: 1.0, max: 20.0, onChanged: (v) {
+                setModalState(() => targetGain = v);
+                setState(() => targetGain = v);
                 _saveSettings();
               }),
-            ],
-
-            _settingLabel("Needle Speed", "${smoothingSpeed.toInt()}ms"),
-            Slider(value: smoothingSpeed, min: 50, max: 500, onChanged: (v) {
-              setModalState(() => smoothingSpeed = v);
-              setState(() => smoothingSpeed = v);
-              _saveSettings();
-            }),
-
-            _settingLabel("Sensitivity", sensitivity.toStringAsFixed(2)),
-            Slider(value: sensitivity, min: 0.1, max: 0.9, onChanged: (v) {
-              setModalState(() => sensitivity = v);
-              setState(() => sensitivity = v);
-              _saveSettings();
-            }),
-          ]),
+              _settingLabel("Pitch Sensitivity", sensitivity.toStringAsFixed(2)),
+              Slider(value: sensitivity, min: 0.1, max: 0.9, onChanged: (v) {
+                setModalState(() => sensitivity = v);
+                setState(() => sensitivity = v);
+                _saveSettings();
+              }),
+            ]),
+          ),
         ),
       ),
     );
@@ -272,7 +275,6 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
           TextSpan(text: octave, style: TextStyle(fontSize: 30, color: Colors.blueAccent.withOpacity(0.7), fontFeatures: const [FontFeature.subscripts()])),
         ])),
         Text("${hz.toStringAsFixed(1)} Hz", style: const TextStyle(fontSize: 20, color: Colors.blueAccent)),
-
         Expanded(
           child: Container(
             margin: const EdgeInsets.symmetric(vertical: 20),
@@ -284,11 +286,16 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
                 : CustomPaint(painter: RollingRollPainter(_traceHistory, _currentLerpedNote, pianoRollZoom)),
           ),
         ),
-
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
           child: Column(children: [
-            Slider(value: cents.toDouble().clamp(-50, 50), min: -50, max: 50, onChanged: null, activeColor: isCorrect ? Colors.green : Colors.red),
+            // Custom Cents Meter replacing the standard slider
+            SizedBox(
+              height: 40,
+              width: double.infinity,
+              child: CustomPaint(painter: CentsMeterPainter(cents.toDouble())),
+            ),
+            const SizedBox(height: 10),
             Text("${cents.abs()} cents ${cents > 0 ? 'sharp' : 'flat'}",
                 style: TextStyle(fontSize: 16, color: isCorrect ? Colors.green : Colors.white70)),
           ]),
@@ -296,6 +303,48 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
       ]),
     );
   }
+}
+
+class CentsMeterPainter extends CustomPainter {
+  final double cents;
+  CentsMeterPainter(this.cents);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double midX = size.width / 2;
+    final double range = 50.0;
+
+    // Background Track
+    canvas.drawLine(Offset(0, size.height / 2), Offset(size.width, size.height / 2),
+        Paint()..color = Colors.white12..strokeWidth = 2);
+
+    // Tick marks
+    final tickPaint = Paint()..color = Colors.white24..strokeWidth = 1;
+    for (int i = -50; i <= 50; i += 10) {
+      double x = midX + (i / range) * midX;
+      double h = i % 50 == 0 ? 15 : 8;
+      canvas.drawLine(Offset(x, (size.height / 2) - h/2), Offset(x, (size.height / 2) + h/2), tickPaint);
+    }
+
+    // Needle Color Logic
+    Color needleColor = _getNeedleColor(cents.abs());
+
+    // Needle (Vertical line)
+    double needleX = midX + (cents.clamp(-50, 50) / range) * midX;
+    canvas.drawLine(
+        Offset(needleX, 0),
+        Offset(needleX, size.height),
+        Paint()..color = needleColor..strokeWidth = 3..strokeCap = StrokeCap.round
+    );
+  }
+
+  Color _getNeedleColor(double absCents) {
+    if (absCents < 5) return Colors.greenAccent;
+    if (absCents < 20) return Colors.yellowAccent;
+    return Colors.redAccent;
+  }
+
+  @override bool shouldRepaint(CentsMeterPainter old) => old.cents != cents;
 }
 
 class RollingRollPainter extends CustomPainter {
@@ -310,8 +359,6 @@ class RollingRollPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final double midX = size.width / 2;
     final double stepX = (size.width / 2) * zoom;
-
-    // Label Area Offset
     const double bottomMargin = 40.0;
     final double drawingHeight = size.height - bottomMargin;
 
@@ -324,8 +371,6 @@ class RollingRollPainter extends CustomPainter {
     for (int i = 0; i < history.length; i++) {
       double relativeSemitones = history[i].y - centerNoteIndex;
       double xPos = midX + (relativeSemitones * stepX);
-
-      // Calculate yPos to start ABOVE the margin
       double yPos = drawingHeight - (i * (drawingHeight / 120));
 
       if (first) { path.moveTo(xPos, yPos); first = false; }
@@ -341,7 +386,6 @@ class RollingRollPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeJoin = StrokeJoin.round);
 
-    // Static Center Line
     canvas.drawLine(Offset(midX, 0), Offset(midX, drawingHeight),
         Paint()..color = Colors.white.withOpacity(0.3)..strokeWidth = 1.5);
   }
@@ -354,31 +398,31 @@ class RollingRollPainter extends CustomPainter {
       double xPos = midX + ((n - centerNoteIndex) * stepX);
       bool isActive = (n - centerNoteIndex).abs() < 0.2;
 
+      // Emphasize the active grid line
       final linePaint = Paint()
-        ..color = isActive ? Colors.blueAccent.withOpacity(0.3) : Colors.white.withOpacity(0.08)
-        ..strokeWidth = isActive ? 2 : 1;
+        ..color = isActive ? Colors.blueAccent.withOpacity(0.6) : Colors.white.withOpacity(0.08)
+        ..strokeWidth = isActive ? 3 : 1;
 
-      // Draw lines only down to the drawingHeight
       canvas.drawLine(Offset(xPos, 0), Offset(xPos, drawingHeight), linePaint);
 
       final int nameIdx = (n + 57) % 12;
-      final int octave = ((n + 57) / 12).floor();
-      final String label = "${noteNames[nameIdx]}$octave";
+      final int octaveNum = ((n + 57) / 12).floor();
+      final String label = "${noteNames[nameIdx]}$octaveNum";
 
       final TextPainter textPainter = TextPainter(
         text: TextSpan(
             text: label,
             style: TextStyle(
-                color: isActive ? Colors.blueAccent : Colors.white.withOpacity(0.4),
-                fontSize: isActive ? 14 : 11,
-                fontWeight: FontWeight.bold
+              color: isActive ? Colors.blueAccent : Colors.white.withOpacity(0.4),
+              fontSize: isActive ? 14 : 11,
+              fontWeight: FontWeight.bold,
             )
         ),
         textDirection: TextDirection.ltr,
       )..layout();
 
-      // Paint labels in the bottomMargin area
-      textPainter.paint(canvas, Offset(xPos + 4, drawingHeight + 5));
+      // CENTER ALIGNMENT: Subtract half width from xPos
+      textPainter.paint(canvas, Offset(xPos - (textPainter.width / 2), drawingHeight + 5));
     }
   }
 
