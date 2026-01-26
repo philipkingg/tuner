@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:pitch_detector_dart/pitch_detector.dart';
 import 'package:record/record.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 void main() => runApp(const TunerApp());
 
@@ -79,6 +80,15 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
     _initApp();
   }
 
+  @override
+  void dispose() {
+    WakelockPlus.disable(); // Allow iPhone to sleep again
+    _audioStreamSubscription?.cancel();
+    _audioRecorder.dispose();
+    _needleController.dispose();
+    super.dispose();
+  }
+
   Future<void> _initApp() async {
     _prefs = await SharedPreferences.getInstance();
     _loadSettings();
@@ -124,6 +134,8 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
 
   Future<void> _startTuning() async {
     if (await _audioRecorder.hasPermission()) {
+      WakelockPlus.enable(); // Keep the screen on during tuning
+
       const config = RecordConfig(encoder: AudioEncoder.pcm16bits, sampleRate: 44100, numChannels: 1);
       final stream = await _audioRecorder.startStream(config);
       _audioStreamSubscription = stream.listen((Uint8List data) => _processBytes(data));
@@ -266,7 +278,7 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
                 child: FilledButton.tonalIcon(
                   onPressed: () {
                     _resetToDefaults();
-                    setModalState(() {}); // Refresh modal view
+                    setModalState(() {});
                   },
                   icon: const Icon(Icons.restore),
                   label: const Text("Reset to Defaults"),
