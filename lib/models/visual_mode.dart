@@ -1,0 +1,1 @@
+enum VisualMode { needle, rollingTrace }
