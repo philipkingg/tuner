@@ -8,12 +8,14 @@ class SettingsSheet extends StatefulWidget {
   final double smoothingSpeed;
   final double pianoRollZoom;
   final double traceLerpFactor;
+  final double scrollSpeed;
   final ValueChanged<VisualMode> onVisualModeChanged;
   final ValueChanged<double> onTargetGainChanged;
   final ValueChanged<double> onSensitivityChanged;
   final ValueChanged<double> onSmoothingSpeedChanged;
   final ValueChanged<double> onPianoRollZoomChanged;
   final ValueChanged<double> onTraceLerpFactorChanged;
+  final ValueChanged<double> onScrollSpeedChanged;
   final VoidCallback onResetToDefaults;
 
   const SettingsSheet({
@@ -24,12 +26,14 @@ class SettingsSheet extends StatefulWidget {
     required this.smoothingSpeed,
     required this.pianoRollZoom,
     required this.traceLerpFactor,
+    required this.scrollSpeed,
     required this.onVisualModeChanged,
     required this.onTargetGainChanged,
     required this.onSensitivityChanged,
     required this.onSmoothingSpeedChanged,
     required this.onPianoRollZoomChanged,
     required this.onTraceLerpFactorChanged,
+    required this.onScrollSpeedChanged,
     required this.onResetToDefaults,
   });
 
@@ -38,23 +42,15 @@ class SettingsSheet extends StatefulWidget {
 }
 
 class _SettingsSheetState extends State<SettingsSheet> {
-  // Local state to update sliders smoothly while dragging before committing?
-  // Actually the original code updated state immediately on change.
-  // We will keep it simple and rely on parent update or local state if needed.
-  // The original used StatefulBuilder for the modal to update itself.
-  // Since we are now a Stateful widget, we can just use setStates locally if we want visuals to update,
-  // but we also need to notify parent.
-  // Actually, the parent rebuilds the sheet? No, showModalBottomSheet doesn't rebuild when parent rebuilds usually unless we pass a new builder.
-  // The original code used StatefulBuilder INSIDE the sheet builder.
-  
-  // Let's use local state initialized from widget properties, and call callbacks on change.
-  
   late VisualMode _visualMode;
   late double _targetGain;
   late double _sensitivity;
   late double _smoothingSpeed;
   late double _pianoRollZoom;
   late double _traceLerpFactor;
+  late double _scrollSpeed;
+
+  bool _isConfirmingReset = false;
 
   @override
   void initState() {
@@ -65,9 +61,9 @@ class _SettingsSheetState extends State<SettingsSheet> {
     _smoothingSpeed = widget.smoothingSpeed;
     _pianoRollZoom = widget.pianoRollZoom;
     _traceLerpFactor = widget.traceLerpFactor;
+    _scrollSpeed = widget.scrollSpeed;
   }
 
-  // Update local state when widget updates (if parent rebuilds sheet)
   @override
   void didUpdateWidget(SettingsSheet oldWidget) {
       super.didUpdateWidget(oldWidget);
@@ -77,6 +73,7 @@ class _SettingsSheetState extends State<SettingsSheet> {
       if (oldWidget.smoothingSpeed != widget.smoothingSpeed) _smoothingSpeed = widget.smoothingSpeed;
       if (oldWidget.pianoRollZoom != widget.pianoRollZoom) _pianoRollZoom = widget.pianoRollZoom;
       if (oldWidget.traceLerpFactor != widget.traceLerpFactor) _traceLerpFactor = widget.traceLerpFactor;
+      if (oldWidget.scrollSpeed != widget.scrollSpeed) _scrollSpeed = widget.scrollSpeed;
   }
 
   @override
@@ -113,6 +110,11 @@ class _SettingsSheetState extends State<SettingsSheet> {
               setState(() => _traceLerpFactor = v);
               widget.onTraceLerpFactorChanged(v);
             }),
+            _settingLabel("Scroll Speed", "${_scrollSpeed.toStringAsFixed(1)}x"),
+            Slider(value: _scrollSpeed, min: 0.1, max: 5.0, onChanged: (v) {
+              setState(() => _scrollSpeed = v);
+              widget.onScrollSpeedChanged(v);
+            }),
           ],
 
           _settingLabel("Needle Speed", "${_smoothingSpeed.toInt()}ms"),
@@ -131,19 +133,24 @@ class _SettingsSheetState extends State<SettingsSheet> {
             widget.onSensitivityChanged(v);
           }),
           const SizedBox(height: 24),
-          SizedBox(width: double.infinity, child: FilledButton.tonal(onPressed: () {
-             widget.onResetToDefaults();
-             // We can't easily update local state here without knowing the defaults, 
-             // but if parent triggers rebuild or we just close the sheet it's fine.
-             // Best to maybe just let parent handle reset and we update via didUpdateWidget if we kept it open,
-             // or just assume reset closes or updates.
-             // Actually, the original just reset state and updated. 
-             // Let's force a local update to defaults if we know them, OR rely on parent.
-             // Let's rely on parent to pass new values back if we are persistent, 
-             // but `onResetToDefaults` is void.
-             // For now, let's just call the callback.
-             Navigator.pop(context); // Close on reset to be simple
-          }, child: const Text("Reset to Defaults"))),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: _isConfirmingReset ? Colors.redAccent : Theme.of(context).colorScheme.secondaryContainer,
+                foregroundColor: _isConfirmingReset ? Colors.white : Theme.of(context).colorScheme.onSecondaryContainer,
+              ),
+              onPressed: () {
+                if (_isConfirmingReset) {
+                  widget.onResetToDefaults();
+                  Navigator.pop(context);
+                } else {
+                  setState(() => _isConfirmingReset = true);
+                }
+              },
+              child: Text(_isConfirmingReset ? "Are you sure?" : "Reset to Defaults"),
+            ),
+          ),
         ]),
       ),
     );

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui';
@@ -16,6 +17,7 @@ import '../painters/cents_meter_painter.dart';
 import '../painters/rolling_roll_painter.dart';
 import '../widgets/settings_sheet.dart';
 import '../widgets/tuning_menu.dart';
+import '../widgets/add_tuning_dialog.dart';
 
 class TunerHome extends StatefulWidget {
   const TunerHome({super.key});
@@ -33,7 +35,9 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
   late Animation<double> _needleAnimation;
 
   final List<Point<double>> _traceHistory = [];
-  final int _maxTracePoints = 120;
+  
+  // Dynamic max trace points based on scroll speed
+  int get _maxTracePoints => (120 / scrollSpeed).round();
 
   final List<double> _audioBuffer = [];
   List<double> _wavePoints = [];
@@ -48,12 +52,14 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
   double _dynamicZoomMultiplier = 1.0;
   bool _isInitialized = false;
 
-  final List<TuningPreset> _presets = [
+  static final List<TuningPreset> _kDefaultPresets = [
     TuningPreset(name: "Chromatic", notes: []),
     TuningPreset(name: "Guitar (Standard)", notes: ["E2", "A2", "D3", "G3", "B3", "E4"]),
-    TuningPreset(name: "Guitar (7-String)", notes: ["B1", "E2", "A2", "D3", "G3", "B3", "E4"]),
+    // TuningPreset(name: "Guitar (7-String)", notes: ["B1", "E2", "A2", "D3", "G3", "B3", "E4"]),
     TuningPreset(name: "Bass (Standard)", notes: ["E1", "A1", "D2", "G2"]),
   ];
+
+  List<TuningPreset> _presets = List.from(_kDefaultPresets);
   int _selectedPresetIndex = 0;
 
   VisualMode _visualMode = VisualMode.rollingTrace;
@@ -63,6 +69,7 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
   double smoothingSpeed = 100.0;
   double pianoRollZoom = 1.0;
   double traceLerpFactor = 0.15;
+  double scrollSpeed = 2.0;
 
   @override
   void initState() {
@@ -100,7 +107,22 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
       pianoRollZoom = _prefs!.getDouble('pianoRollZoom') ?? 1.0;
       traceLerpFactor = _prefs!.getDouble('traceLerpFactor') ?? 0.15;
       _selectedPresetIndex = _prefs!.getInt('presetIndex') ?? 0;
+      scrollSpeed = _prefs!.getDouble('scrollSpeed') ?? 2.0;
       gain = targetGain;
+
+      // Load unified presets
+      List<String>? savedPresets = _prefs!.getStringList('saved_presets');
+      if (savedPresets != null && savedPresets.isNotEmpty) {
+        _presets = savedPresets.map((e) => TuningPreset.fromJson(jsonDecode(e))).toList();
+      } else {
+        // Fallback to defaults (already set)
+        _presets = List.from(_kDefaultPresets);
+      }
+      
+      // Validation: Ensure index is valid
+      if (_selectedPresetIndex >= _presets.length) {
+        _selectedPresetIndex = 0;
+      }
     });
   }
 
@@ -113,6 +135,11 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
     await _prefs!.setDouble('pianoRollZoom', pianoRollZoom);
     await _prefs!.setDouble('traceLerpFactor', traceLerpFactor);
     await _prefs!.setInt('presetIndex', _selectedPresetIndex);
+    await _prefs!.setDouble('scrollSpeed', scrollSpeed);
+    
+    // Save all presets
+    List<String> presetsJson = _presets.map((e) => jsonEncode(e.toJson())).toList();
+    await _prefs!.setStringList('saved_presets', presetsJson);
   }
 
   void _resetToDefaults() {
@@ -124,7 +151,15 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
       pianoRollZoom = 1.0;
       traceLerpFactor = 0.15;
       _selectedPresetIndex = 0;
+      scrollSpeed = 2.0;
       gain = targetGain;
+      // Note: resetting defaults does NOT delete custom tunings in this implementation,
+      // it just resets settings. If user wants to reset tunings, they can delete them?
+      // Or should "Reset to Defaults" also restore the default tuning list?
+      // Usually "Reset Settings" is separate from "Factory Reset". 
+      // The prompt was "Reset to Defaults". 
+      // Let's reset the tuning list to strict defaults too, as that seems safer for a "Reset" action.
+      _presets = List.from(_kDefaultPresets);
     });
     _saveSettings();
   }
@@ -176,9 +211,35 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
     if (mounted) setState(() => _wavePoints = currentChunk.take(80).toList());
   }
 
+  // Stabilization State
+  double? _lastConfirmedPitch;
+  int _jumpGuardCounter = 0;
+  static const int _jumpGuardThreshold = 5; // Frames to confirm a jump
+
   void _updateTunerLogic(double newPitch) {
+    // Jump Guard Logic
+    if (_lastConfirmedPitch != null) {
+      double semitoneDiff = 12 * (log(newPitch / _lastConfirmedPitch!) / log(2));
+      if (semitoneDiff.abs() > 3.0) { // Should be a large jump?
+         _jumpGuardCounter++;
+         if (_jumpGuardCounter < _jumpGuardThreshold) {
+           // Ignore this pitch for now, it might be a glitch
+           return;
+         }
+         // Confirmed jump
+         _lastConfirmedPitch = newPitch;
+         _jumpGuardCounter = 0;
+         _pitchHistory.clear(); // Clear history on jump so median doesn't drag
+      } else {
+        _lastConfirmedPitch = newPitch;
+        _jumpGuardCounter = 0;
+      }
+    } else {
+      _lastConfirmedPitch = newPitch;
+    }
+
     _pitchHistory.add(newPitch);
-    if (_pitchHistory.length > 5) _pitchHistory.removeAt(0);
+    if (_pitchHistory.length > 9) _pitchHistory.removeAt(0); // Increased buffer
     List<double> sorted = List.from(_pitchHistory)..sort();
     double medianHz = sorted[sorted.length ~/ 2];
 
@@ -255,10 +316,37 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
           setState(() { _selectedPresetIndex = index; _traceHistory.clear(); });
           _saveSettings();
         },
+        onCreateNew: () {
+          Navigator.pop(context); // Close menu first
+          showDialog(
+            context: context,
+            builder: (context) => AddTuningDialog(
+              onAdd: (newPreset) {
+                setState(() {
+                  _presets.add(newPreset);
+                  _selectedPresetIndex = _presets.length - 1; // Select the new one
+                  _traceHistory.clear();
+                });
+                _saveSettings();
+              },
+            ),
+          );
+        },
+        onDelete: (preset) {
+           setState(() {
+             _presets.remove(preset);
+             if (_selectedPresetIndex >= _presets.length) {
+               _selectedPresetIndex = 0;
+             }
+             _traceHistory.clear();
+           });
+           Navigator.pop(context);
+           _saveSettings();
+        },
       ),
     );
   }
-
+  
   void _showSettings() {
     showModalBottomSheet(
       context: context,
@@ -272,12 +360,14 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
         smoothingSpeed: smoothingSpeed,
         pianoRollZoom: pianoRollZoom,
         traceLerpFactor: traceLerpFactor,
+        scrollSpeed: scrollSpeed,
         onVisualModeChanged: (v) { setState(() => _visualMode = v); _saveSettings(); },
         onTargetGainChanged: (v) { setState(() => targetGain = v); _saveSettings(); },
         onSensitivityChanged: (v) { setState(() => sensitivity = v); _saveSettings(); },
         onSmoothingSpeedChanged: (v) { setState(() => smoothingSpeed = v); _saveSettings(); },
         onPianoRollZoomChanged: (v) { setState(() => pianoRollZoom = v); _saveSettings(); },
         onTraceLerpFactorChanged: (v) { setState(() => traceLerpFactor = v); _saveSettings(); },
+        onScrollSpeedChanged: (v) { setState(() => scrollSpeed = v); _saveSettings(); },
         onResetToDefaults: _resetToDefaults,
       ),
     );
@@ -366,7 +456,7 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
             decoration: const BoxDecoration(color: Colors.black),
             child: _visualMode == VisualMode.needle
                 ? Center(child: SizedBox(height: 120, width: double.infinity, child: CustomPaint(painter: WavePainter(_wavePoints))))
-                : CustomPaint(painter: RollingRollPainter(_traceHistory, _currentLerpedNote, pianoRollZoom * _dynamicZoomMultiplier, currentPreset.notes)),
+                : CustomPaint(painter: RollingRollPainter(_traceHistory, _currentLerpedNote, pianoRollZoom * _dynamicZoomMultiplier, currentPreset.notes, scrollSpeed: scrollSpeed)),
           ),
         ),
         Padding(
