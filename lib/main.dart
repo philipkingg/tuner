@@ -56,6 +56,7 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
   int cents = 0;
 
   double _currentLerpedNote = 0.0;
+  double _dynamicZoomMultiplier = 1.0;
   bool _isInitialized = false;
 
   final List<TuningPreset> _presets = [
@@ -66,20 +67,13 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
   ];
   int _selectedPresetIndex = 0;
 
-  static const VisualMode _defaultVisualMode = VisualMode.rollingTrace;
-  static const double _defaultTargetGain = 5.0;
-  static const double _defaultSensitivity = 0.4;
-  static const double _defaultSmoothingSpeed = 100.0;
-  static const double _defaultPianoRollZoom = 1.0;
-  static const double _defaultTraceLerpFactor = 0.15;
-
-  VisualMode _visualMode = _defaultVisualMode;
+  VisualMode _visualMode = VisualMode.rollingTrace;
   double gain = 1.0;
-  double targetGain = _defaultTargetGain;
-  double sensitivity = _defaultSensitivity;
-  double smoothingSpeed = _defaultSmoothingSpeed;
-  double pianoRollZoom = _defaultPianoRollZoom;
-  double traceLerpFactor = _defaultTraceLerpFactor;
+  double targetGain = 5.0;
+  double sensitivity = 0.4;
+  double smoothingSpeed = 100.0;
+  double pianoRollZoom = 1.0;
+  double traceLerpFactor = 0.15;
 
   @override
   void initState() {
@@ -110,12 +104,12 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
   void _loadSettings() {
     if (_prefs == null) return;
     setState(() {
-      _visualMode = VisualMode.values[_prefs!.getInt('visualMode') ?? _defaultVisualMode.index];
-      targetGain = _prefs!.getDouble('targetGain') ?? _defaultTargetGain;
-      sensitivity = _prefs!.getDouble('sensitivity') ?? _defaultSensitivity;
-      smoothingSpeed = _prefs!.getDouble('smoothingSpeed') ?? _defaultSmoothingSpeed;
-      pianoRollZoom = _prefs!.getDouble('pianoRollZoom') ?? _defaultPianoRollZoom;
-      traceLerpFactor = _prefs!.getDouble('traceLerpFactor') ?? _defaultTraceLerpFactor;
+      _visualMode = VisualMode.values[_prefs!.getInt('visualMode') ?? 1];
+      targetGain = _prefs!.getDouble('targetGain') ?? 5.0;
+      sensitivity = _prefs!.getDouble('sensitivity') ?? 0.4;
+      smoothingSpeed = _prefs!.getDouble('smoothingSpeed') ?? 100.0;
+      pianoRollZoom = _prefs!.getDouble('pianoRollZoom') ?? 1.0;
+      traceLerpFactor = _prefs!.getDouble('traceLerpFactor') ?? 0.15;
       _selectedPresetIndex = _prefs!.getInt('presetIndex') ?? 0;
       gain = targetGain;
     });
@@ -134,12 +128,12 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
 
   void _resetToDefaults() {
     setState(() {
-      _visualMode = _defaultVisualMode;
-      targetGain = _defaultTargetGain;
-      sensitivity = _defaultSensitivity;
-      smoothingSpeed = _defaultSmoothingSpeed;
-      pianoRollZoom = _defaultPianoRollZoom;
-      traceLerpFactor = _defaultTraceLerpFactor;
+      _visualMode = VisualMode.rollingTrace;
+      targetGain = 5.0;
+      sensitivity = 0.4;
+      smoothingSpeed = 100.0;
+      pianoRollZoom = 1.0;
+      traceLerpFactor = 0.15;
       _selectedPresetIndex = 0;
       gain = targetGain;
     });
@@ -183,7 +177,6 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
     if (mounted) setState(() => _wavePoints = currentChunk.take(80).toList());
   }
 
-  // Helper to convert "E2" style strings to MIDI-offset semitones (A4=0)
   double _noteToN(String noteStr) {
     const names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
     RegExp re = RegExp(r"([A-G]#?)(\d)");
@@ -208,14 +201,12 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
     String targetOctave;
 
     if (currentPreset.notes.isEmpty) {
-      // Chromatic snapping
       int roundedN = n.round();
       targetN = roundedN.toDouble();
       const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
       targetName = noteNames[(roundedN + 57) % 12];
       targetOctave = ((roundedN + 57) / 12).floor().toString();
     } else {
-      // TUNING SNAP LOGIC: Find closest note in current instrument list
       double minDiff = double.infinity;
       double closestN = _noteToN(currentPreset.notes.first);
       String closestLabel = currentPreset.notes.first;
@@ -236,10 +227,20 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
       targetOctave = match?.group(2) ?? "";
     }
 
+    // AUTO-ZOOM CALCULATION
+    // If we are more than 0.5 semitones away, start zooming out to keep target in view.
+    double distance = (n - targetN).abs();
+    double targetZoomMult = 1.0;
+    if (distance > 0.5) {
+      // Scale zoom down as distance increases (min zoom 0.2x)
+      targetZoomMult = (1.0 / (distance * 1.5)).clamp(0.2, 1.0);
+    }
+
     double newCents = (n - targetN) * 100;
     _currentLerpedNote = lerpDouble(_currentLerpedNote, n, traceLerpFactor) ?? n;
-    _traceHistory.insert(0, Point(newCents, _currentLerpedNote));
+    _dynamicZoomMultiplier = lerpDouble(_dynamicZoomMultiplier, targetZoomMult, 0.1) ?? 1.0;
 
+    _traceHistory.insert(0, Point(newCents, _currentLerpedNote));
     if (_traceHistory.length > _maxTracePoints) _traceHistory.removeLast();
 
     if (mounted) {
@@ -280,10 +281,7 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
                     subtitle: Text(preset.notes.isEmpty ? "All notes" : preset.notes.join(" • ")),
                     trailing: _selectedPresetIndex == index ? const Icon(Icons.check, color: Colors.green) : null,
                     onTap: () {
-                      setState(() {
-                        _selectedPresetIndex = index;
-                        _traceHistory.clear(); // Clear history when changing tuning
-                      });
+                      setState(() { _selectedPresetIndex = index; _traceHistory.clear(); });
                       _saveSettings();
                       Navigator.pop(context);
                     },
@@ -325,48 +323,26 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
                 },
               ),
               const SizedBox(height: 16),
-              if (_visualMode == VisualMode.rollingTrace) ...[
-                _settingLabel("Zoom (Note Spacing)", pianoRollZoom.toStringAsFixed(1)),
-                Slider(value: pianoRollZoom, min: 0.2, max: 2.0, onChanged: (v) {
-                  setModalState(() => pianoRollZoom = v);
-                  setState(() => pianoRollZoom = v);
-                  _saveSettings();
-                }),
-                _settingLabel("Trace Glide", traceLerpFactor.toStringAsFixed(2)),
-                Slider(value: traceLerpFactor, min: 0.01, max: 0.5, onChanged: (v) {
-                  setModalState(() => traceLerpFactor = v);
-                  setState(() => traceLerpFactor = v);
-                  _saveSettings();
-                }),
-              ],
+              _settingLabel("Base Zoom", pianoRollZoom.toStringAsFixed(1)),
+              Slider(value: pianoRollZoom, min: 0.2, max: 2.0, onChanged: (v) {
+                setModalState(() => pianoRollZoom = v);
+                setState(() => pianoRollZoom = v);
+                _saveSettings();
+              }),
+              _settingLabel("Trace Glide", traceLerpFactor.toStringAsFixed(2)),
+              Slider(value: traceLerpFactor, min: 0.01, max: 0.5, onChanged: (v) {
+                setModalState(() => traceLerpFactor = v);
+                setState(() => traceLerpFactor = v);
+                _saveSettings();
+              }),
               _settingLabel("Needle Speed", "${smoothingSpeed.toInt()}ms"),
               Slider(value: smoothingSpeed, min: 50, max: 500, onChanged: (v) {
                 setModalState(() => smoothingSpeed = v);
                 setState(() => smoothingSpeed = v);
                 _saveSettings();
               }),
-              _settingLabel("Max Audio Gain", targetGain.toStringAsFixed(1)),
-              Slider(value: targetGain, min: 1.0, max: 20.0, onChanged: (v) {
-                setModalState(() => targetGain = v);
-                setState(() => targetGain = v);
-                _saveSettings();
-              }),
-              _settingLabel("Pitch Sensitivity", sensitivity.toStringAsFixed(2)),
-              Slider(value: sensitivity, min: 0.1, max: 0.9, onChanged: (v) {
-                setModalState(() => sensitivity = v);
-                setState(() => sensitivity = v);
-                _saveSettings();
-              }),
               const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.tonalIcon(
-                  onPressed: () { _resetToDefaults(); setModalState(() {}); },
-                  icon: const Icon(Icons.restore),
-                  label: const Text("Reset to Defaults"),
-                  style: FilledButton.styleFrom(backgroundColor: Colors.redAccent.withOpacity(0.1), foregroundColor: Colors.redAccent),
-                ),
-              ),
+              SizedBox(width: double.infinity, child: FilledButton.tonal(onPressed: () { _resetToDefaults(); setModalState(() {}); }, child: const Text("Reset to Defaults"))),
             ]),
           ),
         ),
@@ -394,12 +370,19 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        leading: IconButton(
-          onPressed: _showTuningMenu,
-          icon: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            const Icon(Icons.tune, size: 20),
-            Text(currentPreset.name.split(' ').first, style: const TextStyle(fontSize: 8)),
-          ]),
+        leadingWidth: 120, // Increased width for the text
+        leading: InkWell(
+          onTap: _showTuningMenu,
+          child: Padding(
+            padding: const EdgeInsets.only(left: 12.0),
+            child: Row(
+              children: [
+                const Icon(Icons.tune, size: 22),
+                const SizedBox(width: 8),
+                Expanded(child: Text(currentPreset.name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold), overflow: TextOverflow.visible)),
+              ],
+            ),
+          ),
         ),
         actions: [IconButton(onPressed: _showSettings, icon: const Icon(Icons.settings))],
       ),
@@ -417,7 +400,7 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
             decoration: const BoxDecoration(color: Colors.black),
             child: _visualMode == VisualMode.needle
                 ? Center(child: SizedBox(height: 120, width: double.infinity, child: CustomPaint(painter: WavePainter(_wavePoints))))
-                : CustomPaint(painter: RollingRollPainter(_traceHistory, _currentLerpedNote, pianoRollZoom, currentPreset.notes)),
+                : CustomPaint(painter: RollingRollPainter(_traceHistory, _currentLerpedNote, pianoRollZoom * _dynamicZoomMultiplier, currentPreset.notes)),
           ),
         ),
         Padding(
@@ -436,23 +419,17 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
 class CentsMeterPainter extends CustomPainter {
   final double cents;
   CentsMeterPainter(this.cents);
-
   @override
   void paint(Canvas canvas, Size size) {
     final double midX = size.width / 2;
-    final double range = 50.0;
     canvas.drawLine(Offset(0, size.height / 2), Offset(size.width, size.height / 2), Paint()..color = Colors.white12..strokeWidth = 2);
     for (int i = -50; i <= 50; i += 10) {
-      double x = midX + (i / range) * midX;
-      bool isCenter = i == 0;
-      double h = isCenter ? 20 : (i % 50 == 0 ? 15 : 8);
-      canvas.drawLine(Offset(x, (size.height / 2) - h/2), Offset(x, (size.height / 2) + h/2), Paint()..color = isCenter ? Colors.white70 : Colors.white24..strokeWidth = isCenter ? 2 : 1);
+      double x = midX + (i / 50.0) * midX;
+      canvas.drawLine(Offset(x, (size.height / 2) - 5), Offset(x, (size.height / 2) + 5), Paint()..color = i == 0 ? Colors.white70 : Colors.white24..strokeWidth = i == 0 ? 2 : 1);
     }
-    double needleX = midX + (cents.clamp(-50, 50) / range) * midX;
-    canvas.drawLine(Offset(needleX, 0), Offset(needleX, size.height), Paint()..color = _getNeedleColor(cents.abs())..strokeWidth = 3..strokeCap = StrokeCap.round);
+    double needleX = midX + (cents.clamp(-50, 50) / 50.0) * midX;
+    canvas.drawLine(Offset(needleX, 0), Offset(needleX, size.height), Paint()..color = (cents.abs() < 5 ? Colors.greenAccent : (cents.abs() < 20 ? Colors.yellowAccent : Colors.redAccent))..strokeWidth = 3);
   }
-
-  Color _getNeedleColor(double absCents) => absCents < 5 ? Colors.greenAccent : (absCents < 20 ? Colors.yellowAccent : Colors.redAccent);
   @override bool shouldRepaint(CentsMeterPainter old) => old.cents != cents;
 }
 
@@ -469,9 +446,7 @@ class RollingRollPainter extends CustomPainter {
     RegExp re = RegExp(r"([A-G]#?)(\d)");
     var match = re.firstMatch(noteStr);
     if (match == null) return 0;
-    int noteIdx = noteNames.indexOf(match.group(1)!);
-    int octave = int.parse(match.group(2)!);
-    return (noteIdx + (octave * 12)) - 57.0;
+    return (noteNames.indexOf(match.group(1)!) + (int.parse(match.group(2)!) * 12)) - 57.0;
   }
 
   @override
@@ -480,7 +455,20 @@ class RollingRollPainter extends CustomPainter {
     final double stepX = (size.width / 2) * zoom;
     final double drawingHeight = size.height - 40.0;
 
-    _drawGrid(canvas, size, drawingHeight, midX, stepX);
+    // Draw Grid with larger visibility padding for zooming
+    if (filteredNotes.isEmpty) {
+      int range = (3 / zoom).ceil().clamp(3, 24);
+      int startN = (centerNoteIndex - range).floor();
+      int endN = (centerNoteIndex + range).ceil();
+
+      for (int n = startN; n <= endN; n++) {
+        _drawSingleLine(canvas, n.toDouble(), midX, stepX, drawingHeight);
+      }
+    } else {
+      for (var noteStr in filteredNotes) {
+        _drawSingleLine(canvas, _noteToN(noteStr), midX, stepX, drawingHeight);
+      }
+    }
 
     if (history.isEmpty) return;
     final path = Path();
@@ -489,44 +477,17 @@ class RollingRollPainter extends CustomPainter {
       double yPos = drawingHeight - (i * (drawingHeight / 120));
       if (i == 0) path.moveTo(xPos, yPos); else path.lineTo(xPos, yPos);
     }
-    canvas.drawPath(path, Paint()..color = _getColor(history.first.x.abs())..strokeWidth = 3.5..style = PaintingStyle.stroke..strokeJoin = StrokeJoin.round);
-    canvas.drawLine(Offset(midX, 0), Offset(midX, drawingHeight), Paint()..color = Colors.white.withOpacity(0.3)..strokeWidth = 1.5);
-  }
-
-  void _drawGrid(Canvas canvas, Size size, double drawingHeight, double midX, double stepX) {
-    if (filteredNotes.isEmpty) {
-      // Chromatic Grid
-      int minN = (centerNoteIndex - (1 / zoom) - 2).floor();
-      int maxN = (centerNoteIndex + (1 / zoom) + 2).ceil();
-      for (int n = minN; n <= maxN; n++) {
-        _drawSingleLine(canvas, n.toDouble(), midX, stepX, drawingHeight);
-      }
-    } else {
-      // TUNING GRID: Only show notes in the preset
-      for (var noteStr in filteredNotes) {
-        _drawSingleLine(canvas, _noteToN(noteStr), midX, stepX, drawingHeight);
-      }
-    }
+    canvas.drawPath(path, Paint()..color = Colors.blueAccent..strokeWidth = 3.5..style = PaintingStyle.stroke);
+    canvas.drawLine(Offset(midX, 0), Offset(midX, drawingHeight), Paint()..color = Colors.white24..strokeWidth = 1.5);
   }
 
   void _drawSingleLine(Canvas canvas, double n, double midX, double stepX, double drawingHeight) {
     double xPos = midX + ((n - centerNoteIndex) * stepX);
-    if (xPos < -50 || xPos > midX * 2 + 50) return;
-
+    if (xPos < -80 || xPos > midX * 2 + 80) return;
     bool isActive = (n - centerNoteIndex).abs() < 0.2;
-    canvas.drawLine(Offset(xPos, 0), Offset(xPos, drawingHeight), Paint()
-      ..color = isActive ? Colors.blueAccent.withOpacity(0.6) : Colors.white.withOpacity(0.08)
-      ..strokeWidth = isActive ? 3 : 1);
-
+    canvas.drawLine(Offset(xPos, 0), Offset(xPos, drawingHeight), Paint()..color = isActive ? Colors.blueAccent.withOpacity(0.6) : Colors.white.withOpacity(0.08)..strokeWidth = isActive ? 3 : 1);
     String label = "${noteNames[((n + 57) % 12).toInt()]}${((n + 57) / 12).floor()}";
-    TextPainter(text: TextSpan(text: label, style: TextStyle(color: isActive ? Colors.blueAccent : Colors.white.withOpacity(0.4), fontSize: isActive ? 14 : 11, fontWeight: FontWeight.bold)), textDirection: TextDirection.ltr)
-      ..layout()..paint(canvas, Offset(xPos - 8, drawingHeight + 5));
-  }
-
-  Color _getColor(double cents) {
-    if (cents < 5) return Colors.greenAccent;
-    if (cents < 20) return Color.lerp(Colors.greenAccent, Colors.yellowAccent, (cents - 5) / 15)!;
-    return Color.lerp(Colors.yellowAccent, Colors.redAccent, (cents - 20) / 30.0.clamp(0.1, 1.0))!;
+    TextPainter(text: TextSpan(text: label, style: TextStyle(color: isActive ? Colors.blueAccent : Colors.white24, fontSize: isActive ? 14 : 11, fontWeight: FontWeight.bold)), textDirection: TextDirection.ltr)..layout()..paint(canvas, Offset(xPos - 8, drawingHeight + 5));
   }
   @override bool shouldRepaint(RollingRollPainter old) => true;
 }
