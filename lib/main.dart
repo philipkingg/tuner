@@ -27,7 +27,7 @@ class TunerHome extends StatefulWidget {
   State<TunerHome> createState() => _TunerHomeState();
 }
 
-class _TunerHomeState extends State<TunerHome> with SingleTickerProviderStateMixin {
+class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
   final _audioRecorder = AudioRecorder();
   late PitchDetector _pitchDetector;
   StreamSubscription<Uint8List>? _audioStreamSubscription;
@@ -47,36 +47,33 @@ class _TunerHomeState extends State<TunerHome> with SingleTickerProviderStateMix
   String note = "--";
   String octave = "";
   int cents = 0;
-  int currentNoteIndex = 0;
+
+  double _currentLerpedNote = 0.0;
   bool _isInitialized = false;
 
+  // Settings
   VisualMode _visualMode = VisualMode.rollingTrace;
   double gain = 1.0;
   double targetGain = 5.0;
   double sensitivity = 0.4;
   double smoothingSpeed = 100.0;
   double pianoRollZoom = 1.0;
+  double traceLerpFactor = 0.15;
 
   @override
   void initState() {
     super.initState();
     _pitchDetector = PitchDetector(audioSampleRate: 44100, bufferSize: 4096);
     _needleController = AnimationController(vsync: this, duration: const Duration(milliseconds: 100));
-    _needleAnimation = Tween<double>(begin: 0, end: 0).animate(
-        CurvedAnimation(parent: _needleController, curve: Curves.easeOutCubic)
-    )..addListener(() {
-      if (mounted) setState(() => cents = _needleAnimation.value.round());
-    });
+    _needleAnimation = Tween<double>(begin: 0, end: 0).animate(CurvedAnimation(parent: _needleController, curve: Curves.easeOutCubic))
+      ..addListener(() { if (mounted) setState(() => cents = _needleAnimation.value.round()); });
+
     _initApp();
   }
 
   Future<void> _initApp() async {
-    try {
-      _prefs = await SharedPreferences.getInstance();
-      _loadSettings();
-    } catch (e) {
-      debugPrint("Prefs error: $e");
-    }
+    _prefs = await SharedPreferences.getInstance();
+    _loadSettings();
     await _startTuning();
     if (mounted) setState(() => _isInitialized = true);
   }
@@ -89,6 +86,7 @@ class _TunerHomeState extends State<TunerHome> with SingleTickerProviderStateMix
       sensitivity = _prefs!.getDouble('sensitivity') ?? 0.4;
       smoothingSpeed = _prefs!.getDouble('smoothingSpeed') ?? 100.0;
       pianoRollZoom = _prefs!.getDouble('pianoRollZoom') ?? 1.0;
+      traceLerpFactor = _prefs!.getDouble('traceLerpFactor') ?? 0.15;
       gain = targetGain;
     });
   }
@@ -100,6 +98,7 @@ class _TunerHomeState extends State<TunerHome> with SingleTickerProviderStateMix
     await _prefs!.setDouble('sensitivity', sensitivity);
     await _prefs!.setDouble('smoothingSpeed', smoothingSpeed);
     await _prefs!.setDouble('pianoRollZoom', pianoRollZoom);
+    await _prefs!.setDouble('traceLerpFactor', traceLerpFactor);
   }
 
   Future<void> _startTuning() async {
@@ -135,7 +134,11 @@ class _TunerHomeState extends State<TunerHome> with SingleTickerProviderStateMix
       if (result.pitched && result.probability > sensitivity && result.pitch > 30) {
         _updateTunerLogic(result.pitch);
       } else {
-        _traceHistory.insert(0, const Point(-999.0, -999.0));
+        if (_traceHistory.isNotEmpty) {
+          _traceHistory.insert(0, _traceHistory.first);
+        } else {
+          _traceHistory.insert(0, const Point(0, 0));
+        }
         if (_traceHistory.length > _maxTracePoints) _traceHistory.removeLast();
       }
     }
@@ -156,7 +159,9 @@ class _TunerHomeState extends State<TunerHome> with SingleTickerProviderStateMix
     int detectedOctave = ((roundedN + 57) / 12).floor();
     double newCents = (n - roundedN) * 100;
 
-    _traceHistory.insert(0, Point(newCents, n));
+    _currentLerpedNote = lerpDouble(_currentLerpedNote, n, traceLerpFactor) ?? n;
+    _traceHistory.insert(0, Point(newCents, _currentLerpedNote));
+
     if (_traceHistory.length > _maxTracePoints) _traceHistory.removeLast();
 
     if (mounted) {
@@ -164,8 +169,8 @@ class _TunerHomeState extends State<TunerHome> with SingleTickerProviderStateMix
         hz = medianHz;
         note = noteNames[chromaticIndex];
         octave = detectedOctave.toString();
-        currentNoteIndex = roundedN;
       });
+
       _needleAnimation = Tween<double>(begin: _needleAnimation.value, end: newCents).animate(
           CurvedAnimation(parent: _needleController, curve: Curves.easeOut)
       );
@@ -184,15 +189,15 @@ class _TunerHomeState extends State<TunerHome> with SingleTickerProviderStateMix
         builder: (context, setModalState) => Container(
           padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text("Tuning Settings", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const Text("Tuner Settings", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
             const Divider(height: 32, color: Colors.white24),
 
             const Text("Visual Mode", style: TextStyle(color: Colors.grey)),
             const SizedBox(height: 8),
             SegmentedButton<VisualMode>(
               segments: const [
-                ButtonSegment(value: VisualMode.needle, label: Text("Oscilloscope"), icon: Icon(Icons.waves)),
-                ButtonSegment(value: VisualMode.rollingTrace, label: Text("Piano Roll"), icon: Icon(Icons.linear_scale)),
+                ButtonSegment(value: VisualMode.needle, label: Text("Wave"), icon: Icon(Icons.waves)),
+                ButtonSegment(value: VisualMode.rollingTrace, label: Text("Roll"), icon: Icon(Icons.linear_scale)),
               ],
               selected: {_visualMode},
               onSelectionChanged: (val) {
@@ -201,22 +206,35 @@ class _TunerHomeState extends State<TunerHome> with SingleTickerProviderStateMix
                 _saveSettings();
               },
             ),
-            _settingLabel("Note Spacing", pianoRollZoom.toStringAsFixed(1)),
-            Slider(value: pianoRollZoom, min: 0.5, max: 4.0, onChanged: (v) {
-              setModalState(() => pianoRollZoom = v);
-              setState(() => pianoRollZoom = v);
-              _saveSettings();
-            }),
-            _settingLabel("Lerp Speed", "${smoothingSpeed.toInt()}ms"),
+
+            const SizedBox(height: 16),
+
+            if (_visualMode == VisualMode.rollingTrace) ...[
+              _settingLabel("Zoom (Note Spacing)", pianoRollZoom.toStringAsFixed(1)),
+              Slider(value: pianoRollZoom, min: 0.2, max: 2.0, onChanged: (v) {
+                setModalState(() => pianoRollZoom = v);
+                setState(() => pianoRollZoom = v);
+                _saveSettings();
+              }),
+              _settingLabel("Trace Glide", traceLerpFactor.toStringAsFixed(2)),
+              Slider(value: traceLerpFactor, min: 0.01, max: 0.5, onChanged: (v) {
+                setModalState(() => traceLerpFactor = v);
+                setState(() => traceLerpFactor = v);
+                _saveSettings();
+              }),
+            ],
+
+            _settingLabel("Needle Speed", "${smoothingSpeed.toInt()}ms"),
             Slider(value: smoothingSpeed, min: 50, max: 500, onChanged: (v) {
               setModalState(() => smoothingSpeed = v);
               setState(() => smoothingSpeed = v);
               _saveSettings();
             }),
-            _settingLabel("Gain Cap", "${targetGain.toStringAsFixed(1)}x"),
-            Slider(value: targetGain, min: 1.0, max: 20.0, onChanged: (v) {
-              setModalState(() => targetGain = v);
-              setState(() => targetGain = v);
+
+            _settingLabel("Sensitivity", sensitivity.toStringAsFixed(2)),
+            Slider(value: sensitivity, min: 0.1, max: 0.9, onChanged: (v) {
+              setModalState(() => sensitivity = v);
+              setState(() => sensitivity = v);
               _saveSettings();
             }),
           ]),
@@ -236,14 +254,6 @@ class _TunerHomeState extends State<TunerHome> with SingleTickerProviderStateMix
         ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _needleController.dispose();
-    _audioStreamSubscription?.cancel();
-    _audioRecorder.dispose();
-    super.dispose();
   }
 
   @override
@@ -268,10 +278,10 @@ class _TunerHomeState extends State<TunerHome> with SingleTickerProviderStateMix
             margin: const EdgeInsets.symmetric(vertical: 20),
             width: double.infinity,
             clipBehavior: Clip.hardEdge,
-            decoration: const BoxDecoration(), // Added fix for Clip assertion
+            decoration: const BoxDecoration(color: Colors.black),
             child: _visualMode == VisualMode.needle
                 ? Center(child: SizedBox(height: 120, width: double.infinity, child: CustomPaint(painter: WavePainter(_wavePoints))))
-                : CustomPaint(painter: RollingRollPainter(_traceHistory, currentNoteIndex.toDouble(), pianoRollZoom)),
+                : CustomPaint(painter: RollingRollPainter(_traceHistory, _currentLerpedNote, pianoRollZoom)),
           ),
         ),
 
@@ -279,7 +289,7 @@ class _TunerHomeState extends State<TunerHome> with SingleTickerProviderStateMix
           padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
           child: Column(children: [
             Slider(value: cents.toDouble().clamp(-50, 50), min: -50, max: 50, onChanged: null, activeColor: isCorrect ? Colors.green : Colors.red),
-            Text(cents == 0 ? "Perfect" : "${cents.abs()} cents ${cents > 0 ? 'sharp' : 'flat'}",
+            Text("${cents.abs()} cents ${cents > 0 ? 'sharp' : 'flat'}",
                 style: TextStyle(fontSize: 16, color: isCorrect ? Colors.green : Colors.white70)),
           ]),
         ),
@@ -294,39 +304,91 @@ class RollingRollPainter extends CustomPainter {
   final double zoom;
   RollingRollPainter(this.history, this.centerNoteIndex, this.zoom);
 
+  static const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+
   @override
   void paint(Canvas canvas, Size size) {
     final double midX = size.width / 2;
     final double stepX = (size.width / 2) * zoom;
 
-    canvas.drawLine(Offset(midX, 0), Offset(midX, size.height), Paint()..color = Colors.green.withOpacity(0.3)..strokeWidth = 2);
+    // Label Area Offset
+    const double bottomMargin = 40.0;
+    final double drawingHeight = size.height - bottomMargin;
+
+    _drawGrid(canvas, size, drawingHeight, midX, stepX);
 
     if (history.isEmpty) return;
     final path = Path();
     bool first = true;
 
     for (int i = 0; i < history.length; i++) {
-      if (history[i].x == -999.0) { first = true; continue; }
-
       double relativeSemitones = history[i].y - centerNoteIndex;
       double xPos = midX + (relativeSemitones * stepX);
-      double yPos = size.height - (i * (size.height / 120));
+
+      // Calculate yPos to start ABOVE the margin
+      double yPos = drawingHeight - (i * (drawingHeight / 120));
 
       if (first) { path.moveTo(xPos, yPos); first = false; }
       else { path.lineTo(xPos, yPos); }
     }
 
-    // Safely check history.first to determine current color
-    double currentCents = history.isNotEmpty ? history.first.x.abs() : 0.0;
-    double t = (currentCents / 30.0).clamp(0.0, 1.0);
-    Color lineColor = Color.lerp(Colors.greenAccent, Colors.redAccent, t)!;
+    double currentCents = history.first.x.abs();
+    Color lineColor = _getColor(currentCents);
 
     canvas.drawPath(path, Paint()
       ..color = lineColor
-      ..strokeWidth = 3.0
+      ..strokeWidth = 3.5
       ..style = PaintingStyle.stroke
       ..strokeJoin = StrokeJoin.round);
+
+    // Static Center Line
+    canvas.drawLine(Offset(midX, 0), Offset(midX, drawingHeight),
+        Paint()..color = Colors.white.withOpacity(0.3)..strokeWidth = 1.5);
   }
+
+  void _drawGrid(Canvas canvas, Size size, double drawingHeight, double midX, double stepX) {
+    int minN = (centerNoteIndex - (1 / zoom)).floor() - 1;
+    int maxN = (centerNoteIndex + (1 / zoom)).ceil() + 1;
+
+    for (int n = minN; n <= maxN; n++) {
+      double xPos = midX + ((n - centerNoteIndex) * stepX);
+      bool isActive = (n - centerNoteIndex).abs() < 0.2;
+
+      final linePaint = Paint()
+        ..color = isActive ? Colors.blueAccent.withOpacity(0.3) : Colors.white.withOpacity(0.08)
+        ..strokeWidth = isActive ? 2 : 1;
+
+      // Draw lines only down to the drawingHeight
+      canvas.drawLine(Offset(xPos, 0), Offset(xPos, drawingHeight), linePaint);
+
+      final int nameIdx = (n + 57) % 12;
+      final int octave = ((n + 57) / 12).floor();
+      final String label = "${noteNames[nameIdx]}$octave";
+
+      final TextPainter textPainter = TextPainter(
+        text: TextSpan(
+            text: label,
+            style: TextStyle(
+                color: isActive ? Colors.blueAccent : Colors.white.withOpacity(0.4),
+                fontSize: isActive ? 14 : 11,
+                fontWeight: FontWeight.bold
+            )
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+
+      // Paint labels in the bottomMargin area
+      textPainter.paint(canvas, Offset(xPos + 4, drawingHeight + 5));
+    }
+  }
+
+  Color _getColor(double cents) {
+    if (cents < 5) return Colors.greenAccent;
+    if (cents < 20) return Color.lerp(Colors.greenAccent, Colors.yellowAccent, (cents - 5) / 15)!;
+    if (cents < 35) return Color.lerp(Colors.yellowAccent, Colors.orangeAccent, (cents - 20) / 15)!;
+    return Color.lerp(Colors.orangeAccent, Colors.redAccent, (cents - 35) / 15.0.clamp(0.01, 15.0))!;
+  }
+
   @override bool shouldRepaint(RollingRollPainter old) => true;
 }
 
