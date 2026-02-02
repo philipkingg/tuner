@@ -35,7 +35,7 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
   late Animation<double> _needleAnimation;
 
   final List<Point<double>> _traceHistory = [];
-  
+
   // Dynamic max trace points based on scroll speed
   int get _maxTracePoints => (120 / scrollSpeed).round();
 
@@ -54,7 +54,10 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
 
   static final List<TuningPreset> _kDefaultPresets = [
     TuningPreset(name: "Chromatic", notes: []),
-    TuningPreset(name: "Guitar (Standard)", notes: ["E2", "A2", "D3", "G3", "B3", "E4"]),
+    TuningPreset(
+      name: "Guitar (Standard)",
+      notes: ["E2", "A2", "D3", "G3", "B3", "E4"],
+    ),
     // TuningPreset(name: "Guitar (7-String)", notes: ["B1", "E2", "A2", "D3", "G3", "B3", "E4"]),
     TuningPreset(name: "Bass (Standard)", notes: ["E1", "A1", "D2", "G2"]),
   ];
@@ -75,9 +78,15 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     _pitchDetector = PitchDetector(audioSampleRate: 44100, bufferSize: 4096);
-    _needleController = AnimationController(vsync: this, duration: const Duration(milliseconds: 100));
-    _needleAnimation = Tween<double>(begin: 0, end: 0).animate(CurvedAnimation(parent: _needleController, curve: Curves.easeOutCubic))
-      ..addListener(() { if (mounted) setState(() => cents = _needleAnimation.value.round()); });
+    _needleController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+    );
+    _needleAnimation = Tween<double>(begin: 0, end: 0).animate(
+      CurvedAnimation(parent: _needleController, curve: Curves.easeOutCubic),
+    )..addListener(() {
+      if (mounted) setState(() => cents = _needleAnimation.value.round());
+    });
     _initApp();
   }
 
@@ -113,12 +122,15 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
       // Load unified presets
       List<String>? savedPresets = _prefs!.getStringList('saved_presets');
       if (savedPresets != null && savedPresets.isNotEmpty) {
-        _presets = savedPresets.map((e) => TuningPreset.fromJson(jsonDecode(e))).toList();
+        _presets =
+            savedPresets
+                .map((e) => TuningPreset.fromJson(jsonDecode(e)))
+                .toList();
       } else {
         // Fallback to defaults (already set)
         _presets = List.from(_kDefaultPresets);
       }
-      
+
       // Validation: Ensure index is valid
       if (_selectedPresetIndex >= _presets.length) {
         _selectedPresetIndex = 0;
@@ -136,9 +148,10 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
     await _prefs!.setDouble('traceLerpFactor', traceLerpFactor);
     await _prefs!.setInt('presetIndex', _selectedPresetIndex);
     await _prefs!.setDouble('scrollSpeed', scrollSpeed);
-    
+
     // Save all presets
-    List<String> presetsJson = _presets.map((e) => jsonEncode(e.toJson())).toList();
+    List<String> presetsJson =
+        _presets.map((e) => jsonEncode(e.toJson())).toList();
     await _prefs!.setStringList('saved_presets', presetsJson);
   }
 
@@ -156,8 +169,8 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
       // Note: resetting defaults does NOT delete custom tunings in this implementation,
       // it just resets settings. If user wants to reset tunings, they can delete them?
       // Or should "Reset to Defaults" also restore the default tuning list?
-      // Usually "Reset Settings" is separate from "Factory Reset". 
-      // The prompt was "Reset to Defaults". 
+      // Usually "Reset Settings" is separate from "Factory Reset".
+      // The prompt was "Reset to Defaults".
       // Let's reset the tuning list to strict defaults too, as that seems safer for a "Reset" action.
       _presets = List.from(_kDefaultPresets);
     });
@@ -167,9 +180,15 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
   Future<void> _startTuning() async {
     if (await _audioRecorder.hasPermission()) {
       WakelockPlus.enable();
-      const config = RecordConfig(encoder: AudioEncoder.pcm16bits, sampleRate: 44100, numChannels: 1);
+      const config = RecordConfig(
+        encoder: AudioEncoder.pcm16bits,
+        sampleRate: 44100,
+        numChannels: 1,
+      );
       final stream = await _audioRecorder.startStream(config);
-      _audioStreamSubscription = stream.listen((Uint8List data) => _processBytes(data));
+      _audioStreamSubscription = stream.listen(
+        (Uint8List data) => _processBytes(data),
+      );
     }
   }
 
@@ -194,8 +213,12 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
     while (_audioBuffer.length >= 4096) {
       final List<double> processingBuffer = _audioBuffer.sublist(0, 4096);
       _audioBuffer.removeRange(0, 2048);
-      final result = await _pitchDetector.getPitchFromFloatBuffer(processingBuffer);
-      if (result.pitched && result.probability > sensitivity && result.pitch > 30) {
+      final result = await _pitchDetector.getPitchFromFloatBuffer(
+        processingBuffer,
+      );
+      if (result.pitched &&
+          result.probability > sensitivity &&
+          result.pitch > 30) {
         _updateTunerLogic(result.pitch);
       } else {
         if (_traceHistory.isNotEmpty) {
@@ -219,17 +242,19 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
   void _updateTunerLogic(double newPitch) {
     // Jump Guard Logic
     if (_lastConfirmedPitch != null) {
-      double semitoneDiff = 12 * (log(newPitch / _lastConfirmedPitch!) / log(2));
-      if (semitoneDiff.abs() > 3.0) { // Should be a large jump?
-         _jumpGuardCounter++;
-         if (_jumpGuardCounter < _jumpGuardThreshold) {
-           // Ignore this pitch for now, it might be a glitch
-           return;
-         }
-         // Confirmed jump
-         _lastConfirmedPitch = newPitch;
-         _jumpGuardCounter = 0;
-         _pitchHistory.clear(); // Clear history on jump so median doesn't drag
+      double semitoneDiff =
+          12 * (log(newPitch / _lastConfirmedPitch!) / log(2));
+      if (semitoneDiff.abs() > 3.0) {
+        // Should be a large jump?
+        _jumpGuardCounter++;
+        if (_jumpGuardCounter < _jumpGuardThreshold) {
+          // Ignore this pitch for now, it might be a glitch
+          return;
+        }
+        // Confirmed jump
+        _lastConfirmedPitch = newPitch;
+        _jumpGuardCounter = 0;
+        _pitchHistory.clear(); // Clear history on jump so median doesn't drag
       } else {
         _lastConfirmedPitch = newPitch;
         _jumpGuardCounter = 0;
@@ -284,8 +309,10 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
     }
 
     double newCents = (n - targetN) * 100;
-    _currentLerpedNote = lerpDouble(_currentLerpedNote, n, traceLerpFactor) ?? n;
-    _dynamicZoomMultiplier = lerpDouble(_dynamicZoomMultiplier, targetZoomMult, 0.1) ?? 1.0;
+    _currentLerpedNote =
+        lerpDouble(_currentLerpedNote, n, traceLerpFactor) ?? n;
+    _dynamicZoomMultiplier =
+        lerpDouble(_dynamicZoomMultiplier, targetZoomMult, 0.1) ?? 1.0;
 
     _traceHistory.insert(0, Point(newCents, _currentLerpedNote));
     if (_traceHistory.length > _maxTracePoints) _traceHistory.removeLast();
@@ -296,10 +323,15 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
         note = targetName;
         octave = targetOctave;
       });
-      _needleAnimation = Tween<double>(begin: _needleAnimation.value, end: newCents).animate(
-          CurvedAnimation(parent: _needleController, curve: Curves.easeOut)
+      _needleAnimation = Tween<double>(
+        begin: _needleAnimation.value,
+        end: newCents,
+      ).animate(
+        CurvedAnimation(parent: _needleController, curve: Curves.easeOut),
       );
-      _needleController.duration = Duration(milliseconds: smoothingSpeed.toInt());
+      _needleController.duration = Duration(
+        milliseconds: smoothingSpeed.toInt(),
+      );
       _needleController.forward(from: 0);
     }
   }
@@ -308,74 +340,107 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.grey[900],
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) => TuningMenu(
-        presets: _presets,
-        selectedIndex: _selectedPresetIndex,
-        onPresetSelected: (index) {
-          setState(() { _selectedPresetIndex = index; _traceHistory.clear(); });
-          _saveSettings();
-        },
-        onCreateNew: () {
-          Navigator.pop(context); // Close menu first
-          showDialog(
-            context: context,
-            builder: (context) => AddTuningDialog(
-              onAdd: (newPreset) {
-                setState(() {
-                  _presets.add(newPreset);
-                  _selectedPresetIndex = _presets.length - 1; // Select the new one
-                  _traceHistory.clear();
-                });
-                _saveSettings();
-              },
-            ),
-          );
-        },
-        onDelete: (preset) {
-           setState(() {
-             _presets.remove(preset);
-             if (_selectedPresetIndex >= _presets.length) {
-               _selectedPresetIndex = 0;
-             }
-             _traceHistory.clear();
-           });
-           Navigator.pop(context);
-           _saveSettings();
-        },
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
+      builder:
+          (context) => TuningMenu(
+            presets: _presets,
+            selectedIndex: _selectedPresetIndex,
+            onPresetSelected: (index) {
+              setState(() {
+                _selectedPresetIndex = index;
+                _traceHistory.clear();
+              });
+              _saveSettings();
+            },
+            onCreateNew: () {
+              Navigator.pop(context); // Close menu first
+              showDialog(
+                context: context,
+                builder:
+                    (context) => AddTuningDialog(
+                      onAdd: (newPreset) {
+                        setState(() {
+                          _presets.add(newPreset);
+                          _selectedPresetIndex =
+                              _presets.length - 1; // Select the new one
+                          _traceHistory.clear();
+                        });
+                        _saveSettings();
+                      },
+                    ),
+              );
+            },
+            onDelete: (preset) {
+              setState(() {
+                _presets.remove(preset);
+                if (_selectedPresetIndex >= _presets.length) {
+                  _selectedPresetIndex = 0;
+                }
+                _traceHistory.clear();
+              });
+              Navigator.pop(context);
+              _saveSettings();
+            },
+          ),
     );
   }
-  
+
   void _showSettings() {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.grey[900],
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) => SettingsSheet(
-        visualMode: _visualMode,
-        targetGain: targetGain,
-        sensitivity: sensitivity,
-        smoothingSpeed: smoothingSpeed,
-        pianoRollZoom: pianoRollZoom,
-        traceLerpFactor: traceLerpFactor,
-        scrollSpeed: scrollSpeed,
-        onVisualModeChanged: (v) { setState(() => _visualMode = v); _saveSettings(); },
-        onTargetGainChanged: (v) { setState(() => targetGain = v); _saveSettings(); },
-        onSensitivityChanged: (v) { setState(() => sensitivity = v); _saveSettings(); },
-        onSmoothingSpeedChanged: (v) { setState(() => smoothingSpeed = v); _saveSettings(); },
-        onPianoRollZoomChanged: (v) { setState(() => pianoRollZoom = v); _saveSettings(); },
-        onTraceLerpFactorChanged: (v) { setState(() => traceLerpFactor = v); _saveSettings(); },
-        onScrollSpeedChanged: (v) { setState(() => scrollSpeed = v); _saveSettings(); },
-        onResetToDefaults: _resetToDefaults,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
+      builder:
+          (context) => SettingsSheet(
+            visualMode: _visualMode,
+            targetGain: targetGain,
+            sensitivity: sensitivity,
+            smoothingSpeed: smoothingSpeed,
+            pianoRollZoom: pianoRollZoom,
+            traceLerpFactor: traceLerpFactor,
+            scrollSpeed: scrollSpeed,
+            onVisualModeChanged: (v) {
+              setState(() => _visualMode = v);
+              _saveSettings();
+            },
+            onTargetGainChanged: (v) {
+              setState(() => targetGain = v);
+              _saveSettings();
+            },
+            onSensitivityChanged: (v) {
+              setState(() => sensitivity = v);
+              _saveSettings();
+            },
+            onSmoothingSpeedChanged: (v) {
+              setState(() => smoothingSpeed = v);
+              _saveSettings();
+            },
+            onPianoRollZoomChanged: (v) {
+              setState(() => pianoRollZoom = v);
+              _saveSettings();
+            },
+            onTraceLerpFactorChanged: (v) {
+              setState(() => traceLerpFactor = v);
+              _saveSettings();
+            },
+            onScrollSpeedChanged: (v) {
+              setState(() => scrollSpeed = v);
+              _saveSettings();
+            },
+            onResetToDefaults: _resetToDefaults,
+          ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_isInitialized) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (!_isInitialized)
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     bool isCorrect = cents.abs() < 5 && note != "--";
     final currentPreset = _presets[_selectedPresetIndex];
 
@@ -392,82 +457,141 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
               children: [
                 const Icon(Icons.tune, size: 22),
                 const SizedBox(width: 8),
-                Expanded(child: Text(currentPreset.name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold), overflow: TextOverflow.visible)),
+                Expanded(
+                  child: Text(
+                    currentPreset.name,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.visible,
+                  ),
+                ),
               ],
             ),
           ),
         ),
-        actions: [IconButton(onPressed: _showSettings, icon: const Icon(Icons.settings))],
+        actions: [
+          IconButton(
+            onPressed: _showSettings,
+            icon: const Icon(Icons.settings),
+          ),
+        ],
       ),
-      body: Column(children: [
-        SizedBox(
-          height: 180,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              if (isCorrect)
-                IgnorePointer(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          Colors.greenAccent.withValues(alpha: 0.4),
-                          Colors.transparent,
-                        ],
+      body: Column(
+        children: [
+          SizedBox(
+            height: 180,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                if (isCorrect)
+                  IgnorePointer(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            Colors.greenAccent.withValues(alpha: 0.4),
+                            Colors.transparent,
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              Center(
-                child: RichText(
-                  text: TextSpan(children: [
-                    TextSpan(
-                      text: note,
-                      style: TextStyle(
-                        fontSize: 100,
-                        fontWeight: FontWeight.bold,
-                        color: isCorrect ? Colors.greenAccent : Colors.white,
-                        shadows: isCorrect ? [const Shadow(blurRadius: 20, color: Colors.greenAccent)] : null,
-                      ),
+                Center(
+                  child: RichText(
+                    text: TextSpan(
+                      children: [
+                        TextSpan(
+                          text: note,
+                          style: TextStyle(
+                            fontSize: 100,
+                            fontWeight: FontWeight.bold,
+                            color:
+                                isCorrect ? Colors.greenAccent : Colors.white,
+                            shadows:
+                                isCorrect
+                                    ? [
+                                      const Shadow(
+                                        blurRadius: 20,
+                                        color: Colors.greenAccent,
+                                      ),
+                                    ]
+                                    : null,
+                          ),
+                        ),
+                        TextSpan(
+                          text: octave,
+                          style: TextStyle(
+                            fontSize: 30,
+                            color: Colors.blueAccent.withValues(alpha: 0.7),
+                            fontFeatures: const [FontFeature.subscripts()],
+                          ),
+                        ),
+                      ],
                     ),
-                    TextSpan(
-                      text: octave,
-                      style: TextStyle(
-                        fontSize: 30,
-                        color: Colors.blueAccent.withValues(alpha: 0.7),
-                        fontFeatures: const [FontFeature.subscripts()],
-                      ),
-                    ),
-                  ]),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
 
-        Text("${hz.toStringAsFixed(1)} Hz", style: const TextStyle(fontSize: 20, color: Colors.blueAccent)),
-
-        Expanded(
-          child: Container(
-            margin: const EdgeInsets.symmetric(vertical: 20),
-            width: double.infinity,
-            clipBehavior: Clip.hardEdge,
-            decoration: const BoxDecoration(color: Colors.black),
-            child: _visualMode == VisualMode.needle
-                ? Center(child: SizedBox(height: 120, width: double.infinity, child: CustomPaint(painter: WavePainter(_wavePoints))))
-                : CustomPaint(painter: RollingRollPainter(_traceHistory, _currentLerpedNote, pianoRollZoom * _dynamicZoomMultiplier, currentPreset.notes, scrollSpeed: scrollSpeed)),
+          Text(
+            "${hz.toStringAsFixed(1)} Hz",
+            style: const TextStyle(fontSize: 20, color: Colors.blueAccent),
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
-          child: Column(children: [
-            SizedBox(height: 40, width: double.infinity, child: CustomPaint(painter: CentsMeterPainter(cents.toDouble()))),
-            const SizedBox(height: 10),
-            Text("${cents.abs()} cents ${cents > 0 ? 'sharp' : 'flat'}", style: TextStyle(fontSize: 16, color: isCorrect ? Colors.greenAccent : Colors.white70)),
-          ]),
-        ),
-      ]),
+
+          Expanded(
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 20),
+              width: double.infinity,
+              clipBehavior: Clip.hardEdge,
+              decoration: const BoxDecoration(color: Colors.black),
+              child:
+                  _visualMode == VisualMode.needle
+                      ? Center(
+                        child: SizedBox(
+                          height: 120,
+                          width: double.infinity,
+                          child: CustomPaint(painter: WavePainter(_wavePoints)),
+                        ),
+                      )
+                      : CustomPaint(
+                        painter: RollingRollPainter(
+                          _traceHistory,
+                          _currentLerpedNote,
+                          pianoRollZoom * _dynamicZoomMultiplier,
+                          currentPreset.notes,
+                          scrollSpeed: scrollSpeed,
+                        ),
+                      ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+            child: Column(
+              children: [
+                SizedBox(
+                  height: 40,
+                  width: double.infinity,
+                  child: CustomPaint(
+                    painter: CentsMeterPainter(cents.toDouble()),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  "${cents.abs()} cents ${cents > 0 ? 'sharp' : 'flat'}",
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: isCorrect ? Colors.greenAccent : Colors.white70,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
