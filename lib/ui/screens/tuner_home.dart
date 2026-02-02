@@ -4,11 +4,10 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:pitch_detector_dart/pitch_detector.dart';
 import 'package:record/record.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
-
 import '../../models/tuning_preset.dart';
 import '../../models/visual_mode.dart';
 import '../../utils/note_utils.dart';
@@ -25,7 +24,8 @@ class TunerHome extends StatefulWidget {
   State<TunerHome> createState() => _TunerHomeState();
 }
 
-class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
+class _TunerHomeState extends State<TunerHome>
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   final _audioRecorder = AudioRecorder();
   late PitchDetector _pitchDetector;
   StreamSubscription<Uint8List>? _audioStreamSubscription;
@@ -51,6 +51,7 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
   double _currentLerpedNote = 0.0;
   double _dynamicZoomMultiplier = 1.0;
   bool _isInitialized = false;
+  bool _hasMicPermission = true;
 
   static final List<TuningPreset> _kDefaultPresets = [
     TuningPreset(name: "Chromatic", notes: []),
@@ -67,7 +68,7 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
 
   VisualMode _visualMode = VisualMode.rollingTrace;
   double gain = 1.0;
-  double targetGain = 5.0;
+  double targetGain = 20.0;
   double sensitivity = 0.4;
   double smoothingSpeed = 100.0;
   double pianoRollZoom = 1.0;
@@ -77,6 +78,7 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _pitchDetector = PitchDetector(audioSampleRate: 44100, bufferSize: 4096);
     _needleController = AnimationController(
       vsync: this,
@@ -92,16 +94,45 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    WakelockPlus.disable();
-    _audioStreamSubscription?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    platform.invokeMethod('toggle', false);
+    _stopTuning();
     _audioRecorder.dispose();
     _needleController.dispose();
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      _stopTuning();
+    } else if (state == AppLifecycleState.resumed) {
+      _checkPermission();
+      _startTuning();
+    }
+  }
+
+  Future<void> _checkPermission() async {
+    final hasPermission = await _audioRecorder.hasPermission();
+    if (mounted) {
+      setState(() {
+        _hasMicPermission = hasPermission;
+      });
+    }
+  }
+
+  Future<void> _openAppSettings() async {
+    try {
+      await platform.invokeMethod('openSettings');
+    } catch (e) {
+      debugPrint("Failed to open settings: $e");
+    }
+  }
+
   Future<void> _initApp() async {
     _prefs = await SharedPreferences.getInstance();
     _loadSettings();
+    await _checkPermission();
     await _startTuning();
     if (mounted) setState(() => _isInitialized = true);
   }
@@ -110,7 +141,7 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
     if (_prefs == null) return;
     setState(() {
       _visualMode = VisualMode.values[_prefs!.getInt('visualMode') ?? 1];
-      targetGain = _prefs!.getDouble('targetGain') ?? 5.0;
+      targetGain = _prefs!.getDouble('targetGain') ?? 20.0;
       sensitivity = _prefs!.getDouble('sensitivity') ?? 0.4;
       smoothingSpeed = _prefs!.getDouble('smoothingSpeed') ?? 100.0;
       pianoRollZoom = _prefs!.getDouble('pianoRollZoom') ?? 1.0;
@@ -158,7 +189,7 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
   void _resetToDefaults() {
     setState(() {
       _visualMode = VisualMode.rollingTrace;
-      targetGain = 5.0;
+      targetGain = 20.0;
       sensitivity = 0.4;
       smoothingSpeed = 100.0;
       pianoRollZoom = 1.0;
@@ -177,9 +208,18 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
     _saveSettings();
   }
 
+  static const platform = MethodChannel('com.philip.centigrade/wakelock');
+
   Future<void> _startTuning() async {
+    if (_audioStreamSubscription != null) return; // Already recording
+
     if (await _audioRecorder.hasPermission()) {
-      WakelockPlus.enable();
+      try {
+        await platform.invokeMethod('toggle', true);
+      } catch (e) {
+        debugPrint("Failed to enable wakelock: $e");
+      }
+
       const config = RecordConfig(
         encoder: AudioEncoder.pcm16bits,
         sampleRate: 44100,
@@ -189,6 +229,17 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
       _audioStreamSubscription = stream.listen(
         (Uint8List data) => _processBytes(data),
       );
+    }
+  }
+
+  Future<void> _stopTuning() async {
+    _audioStreamSubscription?.cancel();
+    _audioStreamSubscription = null;
+    await _audioRecorder.stop();
+    try {
+      await platform.invokeMethod('toggle', false);
+    } catch (e) {
+      debugPrint("Failed to disable wakelock: $e");
     }
   }
 
@@ -433,14 +484,17 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
               _saveSettings();
             },
             onResetToDefaults: _resetToDefaults,
+            hasMicPermission: _hasMicPermission,
+            onOpenSettings: _openAppSettings,
           ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_isInitialized)
+    if (!_isInitialized) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     bool isCorrect = cents.abs() < 5 && note != "--";
     final currentPreset = _presets[_selectedPresetIndex];
 
@@ -472,9 +526,37 @@ class _TunerHomeState extends State<TunerHome> with TickerProviderStateMixin {
           ),
         ),
         actions: [
-          IconButton(
-            onPressed: _showSettings,
-            icon: const Icon(Icons.settings),
+          Stack(
+            alignment: Alignment.topRight,
+            children: [
+              IconButton(
+                onPressed: _showSettings,
+                icon: const Icon(Icons.settings),
+              ),
+              if (!_hasMicPermission)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    width: 14,
+                    height: 14,
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(
+                      child: Text(
+                        "!",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ],
       ),
