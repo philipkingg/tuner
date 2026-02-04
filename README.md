@@ -1,4 +1,4 @@
-# CentiGrade tumer
+# CentiGrade tuner
 Pretty simple, install and allow microphone access. 
 
 Settings in the top right.
