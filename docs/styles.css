@@ -589,7 +589,7 @@ body {
 
 .support-content {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    /* grid-template-columns: 1fr 1fr; */
     gap: 4rem;
     max-width: 1100px;
     margin: 0 auto;
