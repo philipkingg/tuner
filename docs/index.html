@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CentiGrade - Precision Tuner Support</title>
+    <meta name="description" content="Support and help for CentiGrade, the precision chromatic tuner for musicians. Get help, tutorials, and FAQs.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#00f5ff;stop-opacity:1" />
+                                <stop offset="100%" style="stop-color:#0099ff;stop-opacity:1" />
+                            </linearGradient>
+                        </defs>
+                        <circle cx="50" cy="50" r="45" fill="none" stroke="url(#logoGradient)" stroke-width="4"/>
+                        <path d="M 50 20 L 50 50 M 35 50 Q 50 35 65 50" fill="none" stroke="url(#logoGradient)" stroke-width="4" stroke-linecap="round"/>
+                        <path d="M 30 65 Q 50 55 70 65" fill="none" stroke="url(#logoGradient)" stroke-width="3" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <span class="logo-text">CentiGrade</span>
+            </div>
+            <nav class="nav">
+                <a href="#home" class="nav-link active">Home</a>
+                <a href="#tutorial" class="nav-link">Tutorial</a>
+                <a href="#faq" class="nav-link">FAQ</a>
+                <a href="#support" class="nav-link">Support</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section id="home" class="hero">
+        <div class="container">
+            <div class="hero-content">
+                <h1 class="hero-title">
+                    Precision Tuning,<br>
+                    <span class="gradient-text">Perfectly Simple</span>
+                </h1>
+                <p class="hero-subtitle">
+                    CentiGrade is a professional-grade chromatic tuner designed for musicians who demand accuracy. 
+                    Tune any instrument with cent-level precision.
+                </p>
+                <div class="hero-buttons">
+                    <a href="#tutorial" class="btn btn-primary">Get Started</a>
+                    <a href="#faq" class="btn btn-secondary">Learn More</a>
+                </div>
+            </div>
+            <div class="hero-visual">
+                <div class="phone-mockup">
+                    <div class="phone-screen">
+                        <div class="tuner-display">
+                            <div class="note-display">A</div>
+                            <div class="frequency">440.0 Hz</div>
+                            <div class="cents-meter">
+                                <div class="meter-bar"></div>
+                                <div class="meter-needle"></div>
+                            </div>
+                            <div class="cents-text">0 cents</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features">
+        <div class="container">
+            <h2 class="section-title">Why CentiGrade?</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🎯</div>
+                    <h3>Cent-Level Accuracy</h3>
+                    <p>Professional precision with visual feedback showing exactly how many cents sharp or flat you are.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎸</div>
+                    <h3>Multiple Tunings</h3>
+                    <p>Pre-loaded with standard tunings for guitar, bass, and more. Create custom tunings for any instrument.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3>Visual Modes</h3>
+                    <p>Choose between rolling trace visualization or traditional needle display to match your preference.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Real-Time Response</h3>
+                    <p>Advanced pitch detection algorithms provide instant, accurate feedback as you tune.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎨</div>
+                    <h3>Beautiful Interface</h3>
+                    <p>Clean, modern design with dark mode that's easy on the eyes during long practice sessions.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⚙️</div>
+                    <h3>Customizable</h3>
+                    <p>Adjust sensitivity, smoothing, gain, and visual settings to match your needs perfectly.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tutorial Section -->
+    <section id="tutorial" class="tutorial">
+        <div class="container">
+            <h2 class="section-title">Quick Start Guide</h2>
+            <div class="tutorial-steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h3>Grant Microphone Access</h3>
+                        <p>When you first open CentiGrade, you'll be asked to allow microphone access. This is required for the app to hear your instrument. If you accidentally denied access, you can enable it in Settings → Privacy → Microphone.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h3>Select Your Tuning</h3>
+                        <p>Tap the tuning preset button in the top-left corner to choose your instrument's tuning. Options include Chromatic (all notes), Guitar Standard, Bass Standard, and more. You can also create custom tunings.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h3>Play a Note</h3>
+                        <p>Play a single note on your instrument. The app will display the detected note name, octave, and frequency. The cents meter shows how far you are from perfect pitch.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <h3>Tune to Perfection</h3>
+                        <p>Adjust your instrument until the cents meter shows 0 (or close to it). When you're within ±5 cents, the display will glow green to indicate you're in tune!</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tips-box">
+                <h3>💡 Pro Tips</h3>
+                <ul>
+                    <li><strong>Quiet Environment:</strong> For best results, tune in a quiet space to minimize background noise.</li>
+                    <li><strong>Play Clearly:</strong> Play notes cleanly and let them ring out. Avoid playing multiple strings at once.</li>
+                    <li><strong>Adjust Sensitivity:</strong> If the tuner is too jumpy or not responsive enough, adjust the sensitivity in Settings.</li>
+                    <li><strong>Visual Modes:</strong> Try the rolling trace mode to see your pitch stability over time.</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ Section -->
+    <section id="faq" class="faq">
+        <div class="container">
+            <h2 class="section-title">Frequently Asked Questions</h2>
+            <div class="faq-list">
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span>What does "cents" mean?</span>
+                        <span class="faq-icon">+</span>
+                    </button>
+                    <div class="faq-answer">
+                        <p>A "cent" is a unit of musical pitch. There are 100 cents in a semitone (the distance between two adjacent notes). When tuning, 0 cents means you're perfectly in tune. Positive cents means you're sharp (too high), and negative cents means you're flat (too low).</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span>Why isn't the tuner detecting my instrument?</span>
+                        <span class="faq-icon">+</span>
+                    </button>
+                    <div class="faq-answer">
+                        <p>There are a few common reasons:</p>
+                        <ul>
+                            <li><strong>Microphone Permission:</strong> Make sure you've granted microphone access to the app.</li>
+                            <li><strong>Volume:</strong> Play louder or move your device closer to the instrument.</li>
+                            <li><strong>Background Noise:</strong> Try tuning in a quieter environment.</li>
+                            <li><strong>Sensitivity:</strong> Increase the sensitivity setting in the Settings menu.</li>
+                            <li><strong>Note Range:</strong> The tuner works best with notes above 30 Hz.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span>How do I create a custom tuning?</span>
+                        <span class="faq-icon">+</span>
+                    </button>
+                    <div class="faq-answer">
+                        <p>Tap the tuning preset button in the top-left, then tap "Create New Tuning" at the bottom of the menu. Enter a name for your tuning and add the notes you want (e.g., "D2", "A2", "D3", etc.). The tuner will then snap to these specific notes when you play.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span>What's the difference between the visual modes?</span>
+                        <span class="faq-icon">+</span>
+                    </button>
+                    <div class="faq-answer">
+                        <p><strong>Rolling Trace Mode:</strong> Shows a scrolling graph of your pitch over time, helping you see pitch stability and trends. Great for understanding how stable your tuning is.</p>
+                        <p><strong>Needle Mode:</strong> Shows a simple waveform visualization. More traditional and less distracting.</p>
+                        <p>You can switch between modes in the Settings menu.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span>The tuner keeps jumping between notes. How do I fix this?</span>
+                        <span class="faq-icon">+</span>
+                    </button>
+                    <div class="faq-answer">
+                        <p>This usually happens when:</p>
+                        <ul>
+                            <li>Multiple strings are ringing (mute the others)</li>
+                            <li>There's background noise interfering</li>
+                            <li>The note is decaying (play it again)</li>
+                            <li>Sensitivity is too high (lower it in Settings)</li>
+                        </ul>
+                        <p>Try increasing the "Smoothing Speed" setting for more stable readings.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span>Can I use this for vocals or other non-string instruments?</span>
+                        <span class="faq-icon">+</span>
+                    </button>
+                    <div class="faq-answer">
+                        <p>Absolutely! CentiGrade works with any pitched sound source. Use the "Chromatic" tuning mode for vocals, wind instruments, or any instrument where you want to see all notes. It's perfect for pitch training and vocal exercises.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span>What do the settings do?</span>
+                        <span class="faq-icon">+</span>
+                    </button>
+                    <div class="faq-answer">
+                        <ul>
+                            <li><strong>Target Gain:</strong> Amplifies the input signal. Increase if your instrument is quiet.</li>
+                            <li><strong>Sensitivity:</strong> How confident the tuner needs to be before showing a note. Lower = more responsive but jumpier.</li>
+                            <li><strong>Smoothing Speed:</strong> How quickly the needle moves. Higher = smoother but slower response.</li>
+                            <li><strong>Trace Lerp Factor:</strong> How smoothly the rolling trace follows pitch changes.</li>
+                            <li><strong>Scroll Speed:</strong> How fast the rolling trace scrolls horizontally.</li>
+                            <li><strong>Piano Roll Zoom:</strong> Vertical zoom level for the rolling trace.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <button class="faq-question">
+                        <span>Is my data private?</span>
+                        <span class="faq-icon">+</span>
+                    </button>
+                    <div class="faq-answer">
+                        <p>Yes! CentiGrade processes all audio locally on your device. No audio data is ever sent to external servers. Your custom tunings and settings are stored only on your device using secure local storage.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Support Section -->
+    <section id="support" class="support">
+        <div class="container">
+            <h2 class="section-title">Need More Help?</h2>
+            <p class="support-subtitle">Can't find what you're looking for? Send us a message and we'll get back to you as soon as possible.</p>
+            
+            <div class="support-content">
+                <form class="support-form" id="supportForm">
+                    <div class="form-group">
+                        <label for="name">Name</label>
+                        <input type="text" id="name" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" name="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="subject">Subject</label>
+                        <select id="subject" name="subject" required>
+                            <option value="">Select a topic...</option>
+                            <option value="technical">Technical Issue</option>
+                            <option value="feature">Feature Request</option>
+                            <option value="bug">Bug Report</option>
+                            <option value="question">General Question</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="message">Message</label>
+                        <textarea id="message" name="message" rows="6" required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-large">Send Message</button>
+                </form>
+
+                <div class="support-info">
+                    <div class="info-card">
+                        <div class="info-icon">📧</div>
+                        <h3>Email Support</h3>
+                        <p>For direct support, you can also email us at:</p>
+                        <a href="mailto:pkingmnt@gmail.com" class="email-link">pkingmnt@gmail.com</a>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-icon">⏱️</div>
+                        <h3>Response Time</h3>
+                        <p>We typically respond within 24-48 hours during business days.</p>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-icon">🐛</div>
+                        <h3>Bug Reports</h3>
+                        <p>When reporting bugs, please include your device model and iOS version for faster resolution.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-logo">
+                    <div class="logo-icon">
+                        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <linearGradient id="footerLogoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#00f5ff;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#0099ff;stop-opacity:1" />
+                                </linearGradient>
+                            </defs>
+                            <circle cx="50" cy="50" r="45" fill="none" stroke="url(#footerLogoGradient)" stroke-width="4"/>
+                            <path d="M 50 20 L 50 50 M 35 50 Q 50 35 65 50" fill="none" stroke="url(#footerLogoGradient)" stroke-width="4" stroke-linecap="round"/>
+                            <path d="M 30 65 Q 50 55 70 65" fill="none" stroke="url(#footerLogoGradient)" stroke-width="3" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    <span class="logo-text">CentiGrade</span>
+                </div>
+                <p class="footer-text">Precision tuning for musicians who care about the details.</p>
+                <p class="footer-copyright">© 2026 CentiGrade. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
