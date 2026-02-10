@@ -41,5 +41,9 @@ class AppConstants {
       notes: ["E2", "A2", "D3", "G3", "B3", "E4"],
     ),
     TuningPreset(name: "Bass (Standard)", notes: ["E1", "A1", "D2", "G2"]),
+    TuningPreset(
+      name: "C Major Scale",
+      notes: ["C", "D", "E", "F", "G", "A", "B"],
+    ),
   ];
 }

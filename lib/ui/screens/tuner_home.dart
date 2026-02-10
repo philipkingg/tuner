@@ -375,7 +375,8 @@ class _TunerHomeState extends State<TunerHome>
       String closestLabel = currentPreset.notes.first;
 
       for (var noteStr in currentPreset.notes) {
-        double presetN = NoteUtils.noteToN(noteStr);
+        // Use getClosestN to handle both specific and generic notes
+        double presetN = NoteUtils.getClosestN(noteStr, n);
         double diff = (n - presetN).abs();
         if (diff < minDiff) {
           minDiff = diff;
@@ -384,10 +385,20 @@ class _TunerHomeState extends State<TunerHome>
         }
       }
       targetN = closestN;
-      RegExp re = RegExp(r"([A-G]#?)(\d)");
-      var match = re.firstMatch(closestLabel);
-      targetName = match?.group(1) ?? "--";
-      targetOctave = match?.group(2) ?? "";
+
+      // If generic, use the detected octave for label
+      // If specific, use the specific octave (already in label)
+      if (NoteUtils.isGeneric(closestLabel)) {
+        targetName = closestLabel;
+        // Calculate octave from targetN
+        int oct = ((targetN + 57) / 12).floor();
+        targetOctave = oct.toString();
+      } else {
+        RegExp re = RegExp(r"([A-G]#?)(\d+)");
+        var match = re.firstMatch(closestLabel);
+        targetName = match?.group(1) ?? "--";
+        targetOctave = match?.group(2) ?? "";
+      }
     }
 
     // AUTO-ZOOM CALCULATION

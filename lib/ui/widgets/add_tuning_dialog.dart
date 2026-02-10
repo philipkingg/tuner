@@ -17,7 +17,7 @@ class _AddTuningDialogState extends State<AddTuningDialog> {
   void _submit() {
     final name = _nameController.text.trim();
     final notesStr = _notesController.text.trim();
-    
+
     if (name.isEmpty) {
       setState(() => _errorText = "Name cannot be empty");
       return;
@@ -27,14 +27,18 @@ class _AddTuningDialogState extends State<AddTuningDialog> {
       return;
     }
 
-    // Parse notes, expect "A2 D3" format
-    final noteList = notesStr.split(RegExp(r'\s+')).map((e) => e.toUpperCase()).toList();
-    
-    // Simple validation
-    RegExp noteRegex = RegExp(r"^[A-G][#]?\d$");
+    // Parse notes, expect "A2 D3" or "C D E" format
+    final noteList =
+        notesStr.split(RegExp(r'\s+')).map((e) => e.toUpperCase()).toList();
+
+    // Simple validation - octave is now optional
+    RegExp noteRegex = RegExp(r"^[A-G][#]?\d*$");
     for (var note in noteList) {
       if (!noteRegex.hasMatch(note)) {
-        setState(() => _errorText = "Invalid note: $note. Usage: 'E2 A2 D3'");
+        setState(
+          () =>
+              _errorText = "Invalid note: $note. Usage: 'E2 A2 D3' or 'C D E'",
+        );
         return;
       }
     }
@@ -48,25 +52,34 @@ class _AddTuningDialogState extends State<AddTuningDialog> {
     return AlertDialog(
       backgroundColor: Colors.grey[900],
       title: const Text("New Tuning"),
-      content: Column(mainAxisSize: MainAxisSize.min, children: [
-        TextField(
-          controller: _nameController,
-          decoration: const InputDecoration(labelText: "Name", hintText: "e.g. Drop D"),
-          style: const TextStyle(color: Colors.white),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _notesController,
-          decoration: InputDecoration(
-            labelText: "Notes (space separated)", 
-            hintText: "e.g. D2 A2 D3 G3 B3 E4",
-            errorText: _errorText,
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _nameController,
+            decoration: const InputDecoration(
+              labelText: "Name",
+              hintText: "e.g. Drop D",
+            ),
+            style: const TextStyle(color: Colors.white),
           ),
-          style: const TextStyle(color: Colors.white),
-        ),
-      ]),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _notesController,
+            decoration: InputDecoration(
+              labelText: "Notes (space separated)",
+              hintText: "e.g. D2 A2 D3 or C D E F G",
+              errorText: _errorText,
+            ),
+            style: const TextStyle(color: Colors.white),
+          ),
+        ],
+      ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text("Cancel"),
+        ),
         FilledButton.tonal(onPressed: _submit, child: const Text("Create")),
       ],
     );

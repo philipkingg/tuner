@@ -61,13 +61,38 @@ class RollingRollPainter extends CustomPainter {
       }
     } else {
       for (var noteStr in filteredNotes) {
-        _drawSingleLine(
-          canvas,
-          NoteUtils.noteToN(noteStr),
-          midX,
-          stepX,
-          drawingHeight,
-        );
+        if (NoteUtils.isGeneric(noteStr)) {
+          // Draw all instances of this note in visible range
+          int range = (3 / zoom).ceil().clamp(3, 24);
+          int startN = (centerNoteIndex - range).floor();
+          int endN = (centerNoteIndex + range).ceil();
+
+          int targetIdx = NoteUtils.noteNames.indexOf(noteStr);
+          if (targetIdx == -1) continue;
+
+          // Iterate octaves
+          // n = (noteIdx + 12*oct) - 57
+          // We want n in [startN, endN]
+          // startN <= (noteIdx + 12*oct - 57) <= endN
+          // startN + 57 - noteIdx <= 12*oct <= endN + 57 - noteIdx
+          // (startN + 57 - noteIdx)/12 <= oct <= (endN + 57 - noteIdx)/12
+
+          int minOct = ((startN + 57 - targetIdx) / 12.0).floor();
+          int maxOct = ((endN + 57 - targetIdx) / 12.0).ceil();
+
+          for (int oct = minOct; oct <= maxOct; oct++) {
+            double n = (targetIdx + (oct * 12)) - 57.0;
+            _drawSingleLine(canvas, n, midX, stepX, drawingHeight);
+          }
+        } else {
+          _drawSingleLine(
+            canvas,
+            NoteUtils.noteToN(noteStr),
+            midX,
+            stepX,
+            drawingHeight,
+          );
+        }
       }
     }
 
