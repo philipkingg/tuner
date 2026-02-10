@@ -13,7 +13,9 @@ import '../../models/visual_mode.dart';
 import '../../utils/note_utils.dart';
 import '../painters/wave_painter.dart';
 import '../painters/cents_meter_painter.dart';
-import '../painters/rolling_roll_painter.dart';
+// import '../painters/rolling_roll_painter.dart'; // Replaced by RollingVisualizer
+import '../widgets/rolling_visualizer.dart';
+import '../../models/trace_point.dart';
 import '../widgets/settings_sheet.dart';
 import '../widgets/tuning_menu.dart';
 import '../widgets/add_tuning_dialog.dart';
@@ -34,10 +36,7 @@ class _TunerHomeState extends State<TunerHome>
   late AnimationController _needleController;
   late Animation<double> _needleAnimation;
 
-  final List<Point<double>> _traceHistory = [];
-
-  // Dynamic max trace points based on scroll speed
-  int get _maxTracePoints => (120 / scrollSpeed).round();
+  final List<TracePoint> _traceHistory = [];
 
   final List<double> _audioBuffer = [];
   List<double> _wavePoints = [];
@@ -72,7 +71,7 @@ class _TunerHomeState extends State<TunerHome>
   double sensitivity = 0.4;
   double smoothingSpeed = 100.0;
   double pianoRollZoom = 1.0;
-  double traceLerpFactor = 0.15;
+  double traceLerpFactor = 0.35;
   double scrollSpeed = 2.0;
 
   @override
@@ -145,7 +144,7 @@ class _TunerHomeState extends State<TunerHome>
       sensitivity = _prefs!.getDouble('sensitivity') ?? 0.4;
       smoothingSpeed = _prefs!.getDouble('smoothingSpeed') ?? 100.0;
       pianoRollZoom = _prefs!.getDouble('pianoRollZoom') ?? 1.0;
-      traceLerpFactor = _prefs!.getDouble('traceLerpFactor') ?? 0.15;
+      traceLerpFactor = _prefs!.getDouble('traceLerpFactor') ?? 0.35;
       _selectedPresetIndex = _prefs!.getInt('presetIndex') ?? 0;
       scrollSpeed = _prefs!.getDouble('scrollSpeed') ?? 2.0;
       gain = targetGain;
@@ -193,7 +192,7 @@ class _TunerHomeState extends State<TunerHome>
       sensitivity = 0.4;
       smoothingSpeed = 100.0;
       pianoRollZoom = 1.0;
-      traceLerpFactor = 0.15;
+      traceLerpFactor = 0.35;
       _selectedPresetIndex = 0;
       scrollSpeed = 2.0;
       gain = targetGain;
@@ -272,14 +271,22 @@ class _TunerHomeState extends State<TunerHome>
           result.pitch > 30) {
         _updateTunerLogic(result.pitch);
       } else {
+        // Continuous painting: Add point even if silence
         if (_traceHistory.isNotEmpty) {
-          _traceHistory.insert(0, _traceHistory.first);
-        } else {
-          _traceHistory.insert(0, const Point(0, 0));
+          // Simply repeat the last point with new timestamp
+          final last = _traceHistory.first;
+          _traceHistory.insert(
+            0,
+            TracePoint(
+              cents: last.cents,
+              note: last.note,
+              timestamp: DateTime.now().millisecondsSinceEpoch,
+            ),
+          );
         }
-        if (_traceHistory.length > _maxTracePoints) {
-          _traceHistory.removeLast();
-        }
+
+        // Prune
+        if (_traceHistory.length > 2000) _traceHistory.removeLast();
       }
     }
     if (mounted) setState(() => _wavePoints = currentChunk.take(80).toList());
@@ -300,6 +307,12 @@ class _TunerHomeState extends State<TunerHome>
         _jumpGuardCounter++;
         if (_jumpGuardCounter < _jumpGuardThreshold) {
           // Ignore this pitch for now, it might be a glitch
+          // If we ignore it, do we still paint the OLD pitch?
+          // If we return here, we fall through to "no update".
+          // But we are in a sub-method now.
+          // If we return, we skip adding a point.
+          // We should probably add a point for the OLD pitch to keep the line continuous?
+          // Or just wait.
           return;
         }
         // Confirmed jump
@@ -360,13 +373,30 @@ class _TunerHomeState extends State<TunerHome>
     }
 
     double newCents = (n - targetN) * 100;
+
+    // Constant "Max" glide = 0.5 or higher? User said "Keep it on max". max was 0.5.
+    // 0.5 is fast.
     _currentLerpedNote =
         lerpDouble(_currentLerpedNote, n, traceLerpFactor) ?? n;
     _dynamicZoomMultiplier =
         lerpDouble(_dynamicZoomMultiplier, targetZoomMult, 0.1) ?? 1.0;
 
-    _traceHistory.insert(0, Point(newCents, _currentLerpedNote));
-    if (_traceHistory.length > _maxTracePoints) _traceHistory.removeLast();
+    _traceHistory.insert(
+      0,
+      TracePoint(
+        cents: newCents,
+        note: _currentLerpedNote,
+        timestamp: DateTime.now().millisecondsSinceEpoch,
+      ),
+    );
+
+    // Prune history based on time? Or Count?
+    // Count is safer for memory, but for visual length:
+    // Visible duration = 5000 / scrollSpeed ms.
+    // If we keep 10 seconds of history, that's safe.
+    // If update rate is 60Hz, 10s = 600 points.
+    // Let's keep a generous count buffer.
+    if (_traceHistory.length > 2000) _traceHistory.removeLast();
 
     if (mounted) {
       setState(() {
@@ -639,14 +669,13 @@ class _TunerHomeState extends State<TunerHome>
                           child: CustomPaint(painter: WavePainter(_wavePoints)),
                         ),
                       )
-                      : CustomPaint(
-                        painter: RollingRollPainter(
-                          _traceHistory,
-                          _currentLerpedNote,
-                          pianoRollZoom * _dynamicZoomMultiplier,
-                          currentPreset.notes,
-                          scrollSpeed: scrollSpeed,
-                        ),
+                      : RollingVisualizer(
+                        history: _traceHistory,
+                        currentCents: cents.toDouble(),
+                        centerNoteIndex: _currentLerpedNote,
+                        zoom: pianoRollZoom * _dynamicZoomMultiplier,
+                        scrollSpeed: scrollSpeed,
+                        filteredNotes: currentPreset.notes,
                       ),
             ),
           ),
