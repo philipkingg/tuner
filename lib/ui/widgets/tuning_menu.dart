@@ -7,6 +7,7 @@ class TuningMenu extends StatelessWidget {
   final ValueChanged<int> onPresetSelected;
   final VoidCallback onCreateNew;
   final ValueChanged<TuningPreset>? onDelete;
+  final VoidCallback? onRestoreDefaults;
 
   const TuningMenu({
     super.key,
@@ -15,6 +16,7 @@ class TuningMenu extends StatelessWidget {
     required this.onPresetSelected,
     required this.onCreateNew,
     this.onDelete,
+    this.onRestoreDefaults,
   });
 
   @override
@@ -29,19 +31,35 @@ class TuningMenu extends StatelessWidget {
             children: [
               const Padding(
                 padding: EdgeInsets.only(left: 20),
-                child: Text("Select Tuning", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(right: 8.0),
-                child: TextButton.icon(
-                  onPressed: () {
-                    // Close this menu first? Or keep it open?
-                    // Usually dialog on top is fine.
-                    onCreateNew();
-                  },
-                  icon: const Icon(Icons.add),
-                  label: const Text("New"),
+                child: Text(
+                  "Select Tuning",
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
+              ),
+              Row(
+                children: [
+                  if (onRestoreDefaults != null)
+                    TextButton.icon(
+                      onPressed: () {
+                        onRestoreDefaults!();
+                        Navigator.pop(context);
+                      },
+                      icon: const Icon(Icons.restore, size: 18),
+                      label: const Text("Restore"),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: TextButton.icon(
+                      onPressed: () {
+                        // Close this menu first? Or keep it open?
+                        // Usually dialog on top is fine.
+                        onCreateNew();
+                      },
+                      icon: const Icon(Icons.add),
+                      label: const Text("New"),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -53,16 +71,28 @@ class TuningMenu extends StatelessWidget {
               itemBuilder: (context, index) {
                 final preset = presets[index];
                 return ListTile(
-                  leading: Icon(index == 0 ? Icons.blur_on : Icons.music_note, color: Colors.blueAccent),
+                  leading: Icon(
+                    index == 0 ? Icons.blur_on : Icons.music_note,
+                    color: Colors.blueAccent,
+                  ),
                   title: Text(preset.name),
-                  subtitle: Text(preset.notes.isEmpty ? "All notes" : preset.notes.join(" • ")),
+                  subtitle: Text(
+                    preset.notes.isEmpty
+                        ? "All notes"
+                        : preset.notes.join(" • "),
+                  ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (selectedIndex == index) const Icon(Icons.check, color: Colors.green),
+                      if (selectedIndex == index)
+                        const Icon(Icons.check, color: Colors.green),
                       if (preset.name != "Chromatic" && onDelete != null)
                         IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.redAccent, size: 20),
+                          icon: const Icon(
+                            Icons.delete,
+                            color: Colors.redAccent,
+                            size: 20,
+                          ),
                           onPressed: () => onDelete!(preset),
                         ),
                     ],

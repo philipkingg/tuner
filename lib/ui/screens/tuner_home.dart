@@ -500,6 +500,21 @@ class _TunerHomeState extends State<TunerHome>
               Navigator.pop(context);
               _saveSettings();
             },
+            onRestoreDefaults: () {
+              setState(() {
+                // Keep custom tunings, only restore missing defaults
+                for (var defaultPreset in _kDefaultPresets) {
+                  bool exists = _presets.any(
+                    (p) => p.name == defaultPreset.name,
+                  );
+                  if (!exists) {
+                    _presets.add(defaultPreset);
+                  }
+                }
+                _traceHistory.clear();
+              });
+              _saveSettings();
+            },
           ),
     );
   }
