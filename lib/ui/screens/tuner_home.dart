@@ -43,8 +43,6 @@ class _TunerHomeState extends State<TunerHome>
   List<double> _wavePoints = [];
   final List<double> _pitchHistory = [];
 
-  double _visualCents = 0.0; // Smoothed cents for visualization
-
   double hz = 0.0;
   String note = "--";
   String octave = "";
@@ -400,11 +398,6 @@ class _TunerHomeState extends State<TunerHome>
     }
 
     double newCents = (n - targetN) * 100;
-
-    // Smooth the visual cents
-    _visualCents =
-        lerpDouble(_visualCents, newCents, traceLerpFactor) ?? newCents;
-
     _currentLerpedNote =
         lerpDouble(_currentLerpedNote, n, traceLerpFactor) ?? n;
     _dynamicZoomMultiplier =
@@ -705,7 +698,7 @@ class _TunerHomeState extends State<TunerHome>
                       )
                       : RollingVisualizer(
                         history: _traceHistory,
-                        currentCents: _visualCents,
+                        currentCents: cents.toDouble(),
                         centerNoteIndex: _currentLerpedNote,
                         zoom: pianoRollZoom * _dynamicZoomMultiplier,
                         scrollSpeed: scrollSpeed,
