@@ -53,7 +53,7 @@ class _SettingsSheetState extends State<SettingsSheet> {
   late double _sensitivity;
   late double _smoothingSpeed;
   late double _pianoRollZoom;
-  late double _traceLerpFactor;
+
   late double _scrollSpeed;
 
   bool _isConfirmingReset = false;
@@ -66,7 +66,6 @@ class _SettingsSheetState extends State<SettingsSheet> {
     _sensitivity = widget.sensitivity;
     _smoothingSpeed = widget.smoothingSpeed;
     _pianoRollZoom = widget.pianoRollZoom;
-    _traceLerpFactor = widget.traceLerpFactor;
     _scrollSpeed = widget.scrollSpeed;
   }
 
@@ -87,9 +86,6 @@ class _SettingsSheetState extends State<SettingsSheet> {
     }
     if (oldWidget.pianoRollZoom != widget.pianoRollZoom) {
       _pianoRollZoom = widget.pianoRollZoom;
-    }
-    if (oldWidget.traceLerpFactor != widget.traceLerpFactor) {
-      _traceLerpFactor = widget.traceLerpFactor;
     }
     if (oldWidget.scrollSpeed != widget.scrollSpeed) {
       _scrollSpeed = widget.scrollSpeed;

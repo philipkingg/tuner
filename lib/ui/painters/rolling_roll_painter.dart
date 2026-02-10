@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../../utils/note_utils.dart';
 import '../../models/trace_point.dart';
@@ -81,27 +83,15 @@ class RollingRollPainter extends CustomPainter {
 
     if (points.length < 2) return;
 
-    final Paint linePaint =
-        Paint()
-          ..strokeWidth = AppConstants.rollingWaveStrokeWidth
-          ..style = PaintingStyle.stroke
-          ..strokeCap = StrokeCap.round;
-
-    // We draw the trace in segments.
-    // Segment 0: Line from Points[0] to Mid(0,1).
-    // Segment i (i=1..N-2): Curve from Mid(i-1, i) to Mid(i, i+1) with Control(i).
-    // Segment Last: Line from Mid(N-2, N-1) to Points[N-1] (optional, or just stop at mid).
-
-    // Pre-calculate positions to avoid re-calc?
-    // Given the dynamic culling, we calculate on the fly.
+    // Vertex Generation Data
+    final List<Offset> vertices = [];
+    final List<Color> colors = [];
+    final float32Indices = <int>[];
 
     // Helper to get screen coordinates
     Offset getPointPos(int index) {
       TracePoint p = points[index];
       double age = currentTimestamp - p.timestamp;
-      // "Now" is at (drawingHeight - offset).
-      // Older points move UP (y decreases).
-      // y = (H - offset) - (age * speed)
       double y =
           drawingHeight -
           AppConstants.rollingWaveRecentOffset -
@@ -110,69 +100,48 @@ class RollingRollPainter extends CustomPainter {
       return Offset(x, y);
     }
 
-    // Draw first segment (Live tip linearity)
-    // Actually, let's treat it as a loop.
-    // We need at least 2 points.
+    // Temporary list to hold high-res central path points + color
+    final List<Map<String, dynamic>> pathPoints = [];
 
-    // We can maximize batching, but we change color per segment.
-    // So we draw many small paths.
+    // Helper to add point to path
+    void addPathPoint(Offset pos, double cents) {
+      pathPoints.add({'pos': pos, 'cents': cents});
+    }
+
+    // --- Generate High-Res Path ---
 
     for (int i = 0; i < points.length - 1; i++) {
-      // We are processing segment between i and i+1?
-      // No, the spline logic focuses on point 'i' as control point (except start/end).
-
-      // Let's adopt the strategy:
-      // Iterate i from 0 to N-2.
-      // Draw the connection that covers the interval around point i+1?
-      //
-      // Standard Midpoint Spline:
-      // Start at P0.
-      // Line to Mid(P0, P1).
-      // For j = 1 to N-2:
-      //    Curve from Mid(P(j-1), Pj) to Mid(Pj, P(j+1)) using Pj as control.
-      // Line from Mid(P(N-2), P(N-1)) to P(N-1).
-
-      // Let's implement this loop.
-
+      // Start Segment (Linear)
       if (i == 0) {
-        // Special Case: Start
         Offset p0 = getPointPos(0);
         Offset p1 = getPointPos(1);
         Offset mid01 = (p0 + p1) / 2.0;
 
-        Path path = Path();
-        path.moveTo(p0.dx, p0.dy);
-        path.lineTo(mid01.dx, mid01.dy);
-
-        linePaint.color = _getColor(points[0].cents);
-        canvas.drawPath(path, linePaint);
-
-        // If we only have 2 points, we also need to finish the line?
+        // Linear subdivision P0 -> Mid01
+        const int sub = 5;
+        for (int s = 0; s <= sub; s++) {
+          // 0 to sub inclusive
+          double t = s / sub;
+          double x = p0.dx + (mid01.dx - p0.dx) * t;
+          double y = p0.dy + (mid01.dy - p0.dy) * t;
+          double c =
+              points[0].cents + (points[1].cents - points[0].cents) * (t * 0.5);
+          addPathPoint(Offset(x, y), c);
+        }
+        // If only 2 points, finish to p1
         if (points.length == 2) {
-          Path endPath = Path();
-          endPath.moveTo(mid01.dx, mid01.dy);
-          endPath.lineTo(p1.dx, p1.dy);
-          linePaint.color = _getColor(points[1].cents);
-          canvas.drawPath(endPath, linePaint);
+          for (int s = 1; s <= sub; s++) {
+            double t = s / sub;
+            double x = mid01.dx + (p1.dx - mid01.dx) * t;
+            double y = mid01.dy + (p1.dy - mid01.dy) * t;
+            addPathPoint(Offset(x, y), points[1].cents);
+          }
         }
       } else {
-        // Interior segments (using points[i] as control point)
-        // Corresponds to 'j' in explanation above.
-        // i is the index of the Control Point.
-        // We draw from Mid(i-1, i) to Mid(i, i+1).
-
+        // Spline Segments
         Offset pPrev = getPointPos(i - 1);
         Offset pCurr = getPointPos(i);
         Offset pNext = getPointPos(i + 1);
-
-        // Optimization: Culling
-        // If pCurr and pNext are way off screen, skip?
-        // pCurr is the control point. The curve is near pCurr.
-        // pNext helps define the endpoint.
-        // y coords are decreasing.
-        // If pCurr.dy < -50 (off top), and pNext.dy < -50, then this segment is off screen.
-        // pPrev.dy is "newer" (lower on screen) than pCurr.
-        // If pPrev is off screen (top), then pCurr is definitely off screen.
 
         if (pCurr.dy < -50 && pNext.dy < -50) continue;
         if (pCurr.dy > drawingHeight + 50 && pNext.dy > drawingHeight + 50)
@@ -181,26 +150,111 @@ class RollingRollPainter extends CustomPainter {
         Offset midPrev = (pPrev + pCurr) / 2.0;
         Offset midNext = (pCurr + pNext) / 2.0;
 
-        Path path = Path();
-        path.moveTo(midPrev.dx, midPrev.dy);
-        path.quadraticBezierTo(pCurr.dx, pCurr.dy, midNext.dx, midNext.dy);
+        double startCents = (points[i - 1].cents + points[i].cents) / 2.0;
+        double endCents = (points[i].cents + points[i + 1].cents) / 2.0;
 
-        linePaint.color = _getColor(points[i].cents);
-        canvas.drawPath(path, linePaint);
+        const int sub = 10;
+        // Subdivide Curve
+        for (int s = 1; s <= sub; s++) {
+          double t = s / sub;
+          double invT = 1 - t;
+          // Quadratic Bezier
+          double x =
+              (invT * invT * midPrev.dx) +
+              (2 * invT * t * pCurr.dx) +
+              (t * t * midNext.dx);
+          double y =
+              (invT * invT * midPrev.dy) +
+              (2 * invT * t * pCurr.dy) +
+              (t * t * midNext.dy);
 
-        // Handle End of Line
+          // Linear cents interp?
+          // Or Quadratic? Let's use linear for now.
+          double c = startCents + (endCents - startCents) * t;
+          // Technically we pass through pCurr control point? No, curve doesn't pass through control point.
+
+          addPathPoint(Offset(x, y), c);
+        }
+
         if (i == points.length - 2) {
-          // This was the last curve (control point was second to last point).
-          // We need to connect Mid(N-2, N-1) to P(N-1).
-          Offset lastP = pNext; // points[i+1] which is points[N-1]
-          Path endPath = Path();
-          endPath.moveTo(midNext.dx, midNext.dy);
-          endPath.lineTo(lastP.dx, lastP.dy);
-          linePaint.color = _getColor(points[i + 1].cents);
-          canvas.drawPath(endPath, linePaint);
+          // Finish to P(N-1)
+          Offset lastP = pNext;
+          const int sub = 5;
+          for (int s = 1; s <= sub; s++) {
+            double t = s / sub;
+            double x = midNext.dx + (lastP.dx - midNext.dx) * t;
+            double y = midNext.dy + (lastP.dy - midNext.dy) * t;
+            addPathPoint(Offset(x, y), points[i + 1].cents);
+          }
         }
       }
     }
+
+    // --- Generate Triangle Strip ---
+    if (pathPoints.isEmpty) return;
+
+    double halfWidth = AppConstants.rollingWaveStrokeWidth / 2.0;
+
+    for (int i = 0; i < pathPoints.length; i++) {
+      Offset current = pathPoints[i]['pos'] as Offset;
+      Offset tangent;
+
+      if (i < pathPoints.length - 1) {
+        tangent = (pathPoints[i + 1]['pos'] as Offset) - current;
+      } else if (i > 0) {
+        tangent = current - (pathPoints[i - 1]['pos'] as Offset);
+      } else {
+        tangent = const Offset(0, 1); // Fallback
+      }
+
+      if (tangent.distance == 0)
+        tangent = const Offset(0, 1);
+      else
+        tangent = tangent / tangent.distance; // Normalize
+
+      // Normal vector (-y, x)
+      Offset normal = Offset(-tangent.dy, tangent.dx);
+
+      Offset vLeft = current + normal * halfWidth;
+      Offset vRight = current - normal * halfWidth;
+
+      // Calculate Color/Alpha
+      double cents = pathPoints[i]['cents'] as double;
+      double alpha = (current.dy / AppConstants.rollingWaveFadeTopHeight).clamp(
+        0.0,
+        1.0,
+      );
+      Color c = _getColor(cents).withValues(alpha: alpha);
+
+      vertices.add(vLeft);
+      vertices.add(vRight);
+      colors.add(c);
+      colors.add(c);
+
+      // Add indices for 2 triangles forming a quad (strip)
+      // Vertices added: 2*i, 2*i+1
+      // Previous were: 2*(i-1), 2*(i-1)+1
+      if (i > 0) {
+        int base = (i - 1) * 2;
+        // Triangle 1: Base, Base+1, Base+2
+        float32Indices.add(base);
+        float32Indices.add(base + 1);
+        float32Indices.add(base + 2);
+        // Triangle 2: Base+1, Base+3, Base+2
+        float32Indices.add(base + 1);
+        float32Indices.add(base + 3);
+        float32Indices.add(base + 2);
+      }
+    }
+
+    final verticesObj = ui.Vertices(
+      ui.VertexMode.triangles,
+      vertices,
+      colors: colors,
+      indices: Int32List.fromList(float32Indices),
+    );
+
+    canvas.drawVertices(verticesObj, BlendMode.srcOver, Paint());
 
     // Draw Center Guide Line
     canvas.drawLine(
