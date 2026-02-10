@@ -169,21 +169,11 @@ class _SettingsSheetState extends State<SettingsSheet> {
               _settingLabel("Base Zoom", _pianoRollZoom.toStringAsFixed(1)),
               Slider(
                 value: _pianoRollZoom,
-                min: 0.2,
+                min: 0.1,
                 max: 2.0,
                 onChanged: (v) {
                   setState(() => _pianoRollZoom = v);
                   widget.onPianoRollZoomChanged(v);
-                },
-              ),
-              _settingLabel("Trace Glide", _traceLerpFactor.toStringAsFixed(2)),
-              Slider(
-                value: _traceLerpFactor,
-                min: 0.01,
-                max: 0.5,
-                onChanged: (v) {
-                  setState(() => _traceLerpFactor = v);
-                  widget.onTraceLerpFactorChanged(v);
                 },
               ),
               _settingLabel(
@@ -205,7 +195,7 @@ class _SettingsSheetState extends State<SettingsSheet> {
             Slider(
               value: _smoothingSpeed,
               min: 50,
-              max: 500,
+              max: 250,
               onChanged: (v) {
                 setState(() => _smoothingSpeed = v);
                 widget.onSmoothingSpeedChanged(v);

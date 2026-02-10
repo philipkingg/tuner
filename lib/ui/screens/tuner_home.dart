@@ -19,6 +19,7 @@ import '../../models/trace_point.dart';
 import '../widgets/settings_sheet.dart';
 import '../widgets/tuning_menu.dart';
 import '../widgets/add_tuning_dialog.dart';
+import '../../utils/app_constants.dart';
 
 class TunerHome extends StatefulWidget {
   const TunerHome({super.key});
@@ -52,36 +53,32 @@ class _TunerHomeState extends State<TunerHome>
   bool _isInitialized = false;
   bool _hasMicPermission = true;
 
-  static final List<TuningPreset> _kDefaultPresets = [
-    TuningPreset(name: "Chromatic", notes: []),
-    TuningPreset(
-      name: "Guitar (Standard)",
-      notes: ["E2", "A2", "D3", "G3", "B3", "E4"],
-    ),
-    // TuningPreset(name: "Guitar (7-String)", notes: ["B1", "E2", "A2", "D3", "G3", "B3", "E4"]),
-    TuningPreset(name: "Bass (Standard)", notes: ["E1", "A1", "D2", "G2"]),
-  ];
+  static final List<TuningPreset> _kDefaultPresets =
+      AppConstants.defaultPresets;
 
   List<TuningPreset> _presets = List.from(_kDefaultPresets);
-  int _selectedPresetIndex = 0;
+  int _selectedPresetIndex = AppConstants.defaultPresetIndex;
 
-  VisualMode _visualMode = VisualMode.rollingTrace;
+  VisualMode _visualMode = AppConstants.defaultVisualMode;
   double gain = 1.0;
-  double targetGain = 20.0;
-  double sensitivity = 0.4;
-  double smoothingSpeed = 100.0;
-  double pianoRollZoom = 1.0;
-  double traceLerpFactor = 0.35;
-  double scrollSpeed = 2.0;
+  double targetGain = AppConstants.defaultTargetGain;
+  double sensitivity = AppConstants.defaultSensitivity;
+  double smoothingSpeed = AppConstants.defaultSmoothingSpeed;
+  double pianoRollZoom = AppConstants.defaultPianoRollZoom;
+  double traceLerpFactor = AppConstants.defaultTraceLerpFactor;
+  double scrollSpeed = AppConstants.defaultScrollSpeed;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _pitchDetector = PitchDetector(audioSampleRate: 44100, bufferSize: 4096);
+    _pitchDetector = PitchDetector(
+      audioSampleRate: AppConstants.audioSampleRate.toDouble(),
+      bufferSize: AppConstants.bufferSize,
+    );
     _needleController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 100),
+      duration: AppConstants.needleAnimationDuration,
     );
     _needleAnimation = Tween<double>(begin: 0, end: 0).animate(
       CurvedAnimation(parent: _needleController, curve: Curves.easeOutCubic),
@@ -140,13 +137,24 @@ class _TunerHomeState extends State<TunerHome>
     if (_prefs == null) return;
     setState(() {
       _visualMode = VisualMode.values[_prefs!.getInt('visualMode') ?? 1];
-      targetGain = _prefs!.getDouble('targetGain') ?? 20.0;
-      sensitivity = _prefs!.getDouble('sensitivity') ?? 0.4;
-      smoothingSpeed = _prefs!.getDouble('smoothingSpeed') ?? 100.0;
-      pianoRollZoom = _prefs!.getDouble('pianoRollZoom') ?? 1.0;
-      traceLerpFactor = _prefs!.getDouble('traceLerpFactor') ?? 0.35;
-      _selectedPresetIndex = _prefs!.getInt('presetIndex') ?? 0;
-      scrollSpeed = _prefs!.getDouble('scrollSpeed') ?? 2.0;
+      targetGain =
+          _prefs!.getDouble('targetGain') ?? AppConstants.defaultTargetGain;
+      sensitivity =
+          _prefs!.getDouble('sensitivity') ?? AppConstants.defaultSensitivity;
+      smoothingSpeed =
+          _prefs!.getDouble('smoothingSpeed') ??
+          AppConstants.defaultSmoothingSpeed;
+      pianoRollZoom =
+          _prefs!.getDouble('pianoRollZoom') ??
+          AppConstants.defaultPianoRollZoom;
+      traceLerpFactor =
+          _prefs!.getDouble('traceLerpFactor') ??
+          AppConstants.defaultTraceLerpFactor;
+      _selectedPresetIndex =
+          _prefs!.getInt('presetIndex') ?? AppConstants.defaultPresetIndex;
+      scrollSpeed =
+          _prefs!.getDouble('scrollSpeed') ?? AppConstants.defaultScrollSpeed;
+
       gain = targetGain;
 
       // Load unified presets
@@ -163,7 +171,7 @@ class _TunerHomeState extends State<TunerHome>
 
       // Validation: Ensure index is valid
       if (_selectedPresetIndex >= _presets.length) {
-        _selectedPresetIndex = 0;
+        _selectedPresetIndex = AppConstants.defaultPresetIndex;
       }
     });
   }
@@ -187,14 +195,14 @@ class _TunerHomeState extends State<TunerHome>
 
   void _resetToDefaults() {
     setState(() {
-      _visualMode = VisualMode.rollingTrace;
-      targetGain = 20.0;
-      sensitivity = 0.4;
-      smoothingSpeed = 100.0;
-      pianoRollZoom = 1.0;
-      traceLerpFactor = 0.35;
-      _selectedPresetIndex = 0;
-      scrollSpeed = 2.0;
+      _visualMode = AppConstants.defaultVisualMode;
+      targetGain = AppConstants.defaultTargetGain;
+      sensitivity = AppConstants.defaultSensitivity;
+      smoothingSpeed = AppConstants.defaultSmoothingSpeed;
+      pianoRollZoom = AppConstants.defaultPianoRollZoom;
+      traceLerpFactor = AppConstants.defaultTraceLerpFactor;
+      _selectedPresetIndex = AppConstants.defaultPresetIndex;
+      scrollSpeed = AppConstants.defaultScrollSpeed;
       gain = targetGain;
       // Note: resetting defaults does NOT delete custom tunings in this implementation,
       // it just resets settings. If user wants to reset tunings, they can delete them?
@@ -221,7 +229,7 @@ class _TunerHomeState extends State<TunerHome>
 
       const config = RecordConfig(
         encoder: AudioEncoder.pcm16bits,
-        sampleRate: 44100,
+        sampleRate: AppConstants.audioSampleRate,
         numChannels: 1,
       );
       final stream = await _audioRecorder.startStream(config);
@@ -260,9 +268,15 @@ class _TunerHomeState extends State<TunerHome>
       gain *= 1.02;
     }
     _audioBuffer.addAll(currentChunk);
-    while (_audioBuffer.length >= 4096) {
-      final List<double> processingBuffer = _audioBuffer.sublist(0, 4096);
-      _audioBuffer.removeRange(0, 2048);
+    while (_audioBuffer.length >= AppConstants.bufferSize) {
+      final List<double> processingBuffer = _audioBuffer.sublist(
+        0,
+        AppConstants.bufferSize,
+      );
+      _audioBuffer.removeRange(
+        0,
+        2048,
+      ); // Leaving overlap. Could be a constant too?
       final result = await _pitchDetector.getPitchFromFloatBuffer(
         processingBuffer,
       );
@@ -271,22 +285,38 @@ class _TunerHomeState extends State<TunerHome>
           result.pitch > 30) {
         _updateTunerLogic(result.pitch);
       } else {
-        // Continuous painting: Add point even if silence
+        // We still want to add history points for "silence" or just let time pass?
+        // With time-based rendering, we only need points when there is data,
+        // OR we need explicit "gap" points if we want the line to break.
+        // The painter draws lines between adjacent points in history.
+        // If we stop adding points, the line stops growing, but the old points will scroll off.
+        // If we want a continuous line of "silence", we should add points.
+        // The old logic added (0,0) which is probably "Center Cents, Center Note"?
+        // 0 cents, 0 note index seems wrong if we are tracking specific notes.
+        // Let's stick to the minimal change: duplicate last point or add a "gap".
+        // Use an out-of-bounds note to indicate gap? Or just skip adding?
+        // If we skip adding, the visualizer just draws a straight line between the last point and the next valid one?
+        // No, it draws segments between history[i] and history[i+1].
+        // If time gaps are large, the line will be long and straight.
+        // Let's add "silence" points if needed, or just let it be.
+        // The original logic inserted (0,0) or last point.
+        // Let's replicate duplicate last point behavior for now to maintain continuity if that was desired.
+        /*
         if (_traceHistory.isNotEmpty) {
-          // Simply repeat the last point with new timestamp
-          final last = _traceHistory.first;
-          _traceHistory.insert(
-            0,
-            TracePoint(
-              cents: last.cents,
-              note: last.note,
-              timestamp: DateTime.now().millisecondsSinceEpoch,
-            ),
-          );
+           // Should we replicate? 
+           // If we replicate, we need a new timestamp.
+           // But if no pitch is detected, maybe we shouldn't draw anything?
         }
-
-        // Prune
-        if (_traceHistory.length > 2000) _traceHistory.removeLast();
+        */
+        // For now, let's NOT add points when silent, to see if it looks cleaner (just gap in data).
+        // Actually, if we don't add points, the last point stays at the "top" of the history stack,
+        // and as time progresses, it will slide down.
+        // Wait, the history is a list of points. The "top" is the most recent.
+        // In time-based, Y = currentTimestamp - pointTimestamp.
+        // If we stop adding points, all existing points get older and slide down.
+        // The "pen" (current time) moves away from the last point.
+        // So the line will end at the last point.
+        // This is correct for "no data".
       }
     }
     if (mounted) setState(() => _wavePoints = currentChunk.take(80).toList());
@@ -295,7 +325,8 @@ class _TunerHomeState extends State<TunerHome>
   // Stabilization State
   double? _lastConfirmedPitch;
   int _jumpGuardCounter = 0;
-  static const int _jumpGuardThreshold = 5; // Frames to confirm a jump
+  static const int _jumpGuardThreshold =
+      AppConstants.jumpGuardThreshold; // Frames to confirm a jump
 
   void _updateTunerLogic(double newPitch) {
     // Jump Guard Logic
@@ -307,12 +338,6 @@ class _TunerHomeState extends State<TunerHome>
         _jumpGuardCounter++;
         if (_jumpGuardCounter < _jumpGuardThreshold) {
           // Ignore this pitch for now, it might be a glitch
-          // If we ignore it, do we still paint the OLD pitch?
-          // If we return here, we fall through to "no update".
-          // But we are in a sub-method now.
-          // If we return, we skip adding a point.
-          // We should probably add a point for the OLD pitch to keep the line continuous?
-          // Or just wait.
           return;
         }
         // Confirmed jump
@@ -373,9 +398,6 @@ class _TunerHomeState extends State<TunerHome>
     }
 
     double newCents = (n - targetN) * 100;
-
-    // Constant "Max" glide = 0.5 or higher? User said "Keep it on max". max was 0.5.
-    // 0.5 is fast.
     _currentLerpedNote =
         lerpDouble(_currentLerpedNote, n, traceLerpFactor) ?? n;
     _dynamicZoomMultiplier =
@@ -396,7 +418,8 @@ class _TunerHomeState extends State<TunerHome>
     // If we keep 10 seconds of history, that's safe.
     // If update rate is 60Hz, 10s = 600 points.
     // Let's keep a generous count buffer.
-    if (_traceHistory.length > 2000) _traceHistory.removeLast();
+    if (_traceHistory.length > AppConstants.maxTracePoints)
+      _traceHistory.removeLast();
 
     if (mounted) {
       setState(() {
@@ -420,9 +443,11 @@ class _TunerHomeState extends State<TunerHome>
   void _showTuningMenu() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.grey[900],
+      backgroundColor: AppConstants.tuningMenuBackgroundColor,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppConstants.tuningMenuBorderRadius),
+        ),
       ),
       builder:
           (context) => TuningMenu(
@@ -457,7 +482,7 @@ class _TunerHomeState extends State<TunerHome>
               setState(() {
                 _presets.remove(preset);
                 if (_selectedPresetIndex >= _presets.length) {
-                  _selectedPresetIndex = 0;
+                  _selectedPresetIndex = AppConstants.defaultPresetIndex;
                 }
                 _traceHistory.clear();
               });
@@ -471,10 +496,12 @@ class _TunerHomeState extends State<TunerHome>
   void _showSettings() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.grey[900],
+      backgroundColor: AppConstants.tuningMenuBackgroundColor,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppConstants.tuningMenuBorderRadius),
+        ),
       ),
       builder:
           (context) => SettingsSheet(

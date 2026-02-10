@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../utils/note_utils.dart';
 import '../../models/trace_point.dart';
+import '../../utils/app_constants.dart';
 
 class RollingRollPainter extends CustomPainter {
   final List<TracePoint> history;
@@ -8,7 +9,7 @@ class RollingRollPainter extends CustomPainter {
   final double zoom;
   final List<String> filteredNotes;
   final double scrollSpeed;
-  final double currentTimestamp;
+  final double currentTimestamp; // Added for time-based rendering
   final double currentCents;
 
   RollingRollPainter(
@@ -44,15 +45,8 @@ class RollingRollPainter extends CustomPainter {
     final double drawingHeight = size.height;
 
     // Calculate speed factor pixels per millisecond
-    // Base speed: 120 points fill the screen height at 1.0 speed
-    // If we assume a point usually comes every ~20-50ms?
-    // Let's calibrate:
-    // Old logic: stepY = drawingHeight / (120 / scrollSpeed);
-    // If update rate is approx 60Hz (16ms) -> too fast?
-    // Tuner updates are likely slower, maybe 20-30Hz.
-    // Let's aim for: 1 second of history takes up X height.
-    // If scrollSpeed 1.0 -> 5 seconds of history visible?
-    final double visibleDurationMs = 5000 / scrollSpeed;
+    final double visibleDurationMs =
+        AppConstants.rollingWaveVisibleDurationMs / scrollSpeed;
     final double pixelsPerMs = drawingHeight / visibleDurationMs;
 
     // Draw Grid
@@ -75,60 +69,137 @@ class RollingRollPainter extends CustomPainter {
       }
     }
 
-    // Live Point Logic: Prepend live point twice to allow smoothing from the very tip
-    // If history is empty, we just have the live point, so we need to handle that.
-    final TracePoint livePoint = TracePoint(
+    // Unified List: [Current, ...History]
+    final TracePoint currentPoint = TracePoint(
       cents: currentCents,
-      note: centerNoteIndex,
+      note:
+          centerNoteIndex, // The pen is at the center index (current lerped note)
       timestamp: currentTimestamp.toInt(),
     );
 
-    final List<TracePoint> paintList = [livePoint, livePoint, ...history];
+    final List<TracePoint> points = [currentPoint, ...history];
 
-    if (paintList.length < 2) return;
+    if (points.length < 2) return;
 
     final Paint linePaint =
         Paint()
-          ..strokeWidth = 3.5
+          ..strokeWidth = AppConstants.rollingWaveStrokeWidth
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round;
 
-    for (int i = 0; i < paintList.length - 1; i++) {
-      // Calculate Y based on constant time
-      double age1 = currentTimestamp - paintList[i].timestamp;
-      double age2 = currentTimestamp - paintList[i + 1].timestamp;
+    // We draw the trace in segments.
+    // Segment 0: Line from Points[0] to Mid(0,1).
+    // Segment i (i=1..N-2): Curve from Mid(i-1, i) to Mid(i, i+1) with Control(i).
+    // Segment Last: Line from Mid(N-2, N-1) to Points[N-1] (optional, or just stop at mid).
 
-      double y1 = drawingHeight - 40 - (age1 * pixelsPerMs);
-      double y2 = drawingHeight - 40 - (age2 * pixelsPerMs);
+    // Pre-calculate positions to avoid re-calc?
+    // Given the dynamic culling, we calculate on the fly.
 
-      // Clip if out of bounds (optimization)
-      if (y1 < -50 && y2 < -50) continue;
-      if (y1 > drawingHeight + 50 && y2 > drawingHeight + 50) continue;
+    // Helper to get screen coordinates
+    Offset getPointPos(int index) {
+      TracePoint p = points[index];
+      double age = currentTimestamp - p.timestamp;
+      // "Now" is at (drawingHeight - offset).
+      // Older points move UP (y decreases).
+      // y = (H - offset) - (age * speed)
+      double y =
+          drawingHeight -
+          AppConstants.rollingWaveRecentOffset -
+          (age * pixelsPerMs);
+      double x = midX + ((p.note - centerNoteIndex) * stepX);
+      return Offset(x, y);
+    }
 
-      double x1 = midX + ((paintList[i].note - centerNoteIndex) * stepX);
-      double x2 = midX + ((paintList[i + 1].note - centerNoteIndex) * stepX);
+    // Draw first segment (Live tip linearity)
+    // Actually, let's treat it as a loop.
+    // We need at least 2 points.
 
-      if (i == 0)
-        continue; // Skip first segment to have prev point for smoothing
+    // We can maximize batching, but we change color per segment.
+    // So we draw many small paths.
 
-      // Previous Data for Smoothing
-      double age0 = currentTimestamp - paintList[i - 1].timestamp;
-      double y0 = drawingHeight - 40 - (age0 * pixelsPerMs);
-      double x0 = midX + ((paintList[i - 1].note - centerNoteIndex) * stepX);
+    for (int i = 0; i < points.length - 1; i++) {
+      // We are processing segment between i and i+1?
+      // No, the spline logic focuses on point 'i' as control point (except start/end).
 
-      // Midpoints
-      double midX1 = (x0 + x1) / 2;
-      double midY1 = (y0 + y1) / 2;
+      // Let's adopt the strategy:
+      // Iterate i from 0 to N-2.
+      // Draw the connection that covers the interval around point i+1?
+      //
+      // Standard Midpoint Spline:
+      // Start at P0.
+      // Line to Mid(P0, P1).
+      // For j = 1 to N-2:
+      //    Curve from Mid(P(j-1), Pj) to Mid(Pj, P(j+1)) using Pj as control.
+      // Line from Mid(P(N-2), P(N-1)) to P(N-1).
 
-      double midX2 = (x1 + x2) / 2;
-      double midY2 = (y1 + y2) / 2;
+      // Let's implement this loop.
 
-      final path = Path();
-      path.moveTo(midX1, midY1);
-      path.quadraticBezierTo(x1, y1, midX2, midY2);
+      if (i == 0) {
+        // Special Case: Start
+        Offset p0 = getPointPos(0);
+        Offset p1 = getPointPos(1);
+        Offset mid01 = (p0 + p1) / 2.0;
 
-      linePaint.color = _getColor(paintList[i].cents);
-      canvas.drawPath(path, linePaint);
+        Path path = Path();
+        path.moveTo(p0.dx, p0.dy);
+        path.lineTo(mid01.dx, mid01.dy);
+
+        linePaint.color = _getColor(points[0].cents);
+        canvas.drawPath(path, linePaint);
+
+        // If we only have 2 points, we also need to finish the line?
+        if (points.length == 2) {
+          Path endPath = Path();
+          endPath.moveTo(mid01.dx, mid01.dy);
+          endPath.lineTo(p1.dx, p1.dy);
+          linePaint.color = _getColor(points[1].cents);
+          canvas.drawPath(endPath, linePaint);
+        }
+      } else {
+        // Interior segments (using points[i] as control point)
+        // Corresponds to 'j' in explanation above.
+        // i is the index of the Control Point.
+        // We draw from Mid(i-1, i) to Mid(i, i+1).
+
+        Offset pPrev = getPointPos(i - 1);
+        Offset pCurr = getPointPos(i);
+        Offset pNext = getPointPos(i + 1);
+
+        // Optimization: Culling
+        // If pCurr and pNext are way off screen, skip?
+        // pCurr is the control point. The curve is near pCurr.
+        // pNext helps define the endpoint.
+        // y coords are decreasing.
+        // If pCurr.dy < -50 (off top), and pNext.dy < -50, then this segment is off screen.
+        // pPrev.dy is "newer" (lower on screen) than pCurr.
+        // If pPrev is off screen (top), then pCurr is definitely off screen.
+
+        if (pCurr.dy < -50 && pNext.dy < -50) continue;
+        if (pCurr.dy > drawingHeight + 50 && pNext.dy > drawingHeight + 50)
+          continue;
+
+        Offset midPrev = (pPrev + pCurr) / 2.0;
+        Offset midNext = (pCurr + pNext) / 2.0;
+
+        Path path = Path();
+        path.moveTo(midPrev.dx, midPrev.dy);
+        path.quadraticBezierTo(pCurr.dx, pCurr.dy, midNext.dx, midNext.dy);
+
+        linePaint.color = _getColor(points[i].cents);
+        canvas.drawPath(path, linePaint);
+
+        // Handle End of Line
+        if (i == points.length - 2) {
+          // This was the last curve (control point was second to last point).
+          // We need to connect Mid(N-2, N-1) to P(N-1).
+          Offset lastP = pNext; // points[i+1] which is points[N-1]
+          Path endPath = Path();
+          endPath.moveTo(midNext.dx, midNext.dy);
+          endPath.lineTo(lastP.dx, lastP.dy);
+          linePaint.color = _getColor(points[i + 1].cents);
+          canvas.drawPath(endPath, linePaint);
+        }
+      }
     }
 
     // Draw Center Guide Line
