@@ -143,8 +143,10 @@ class RollingRollPainter extends CustomPainter {
         Offset pCurr = getPointPos(i);
         Offset pNext = getPointPos(i + 1);
 
-        if (pCurr.dy < -50 && pNext.dy < -50) continue;
-        if (pCurr.dy > drawingHeight + 50 && pNext.dy > drawingHeight + 50)
+        if (pPrev.dy < -50 && pCurr.dy < -50 && pNext.dy < -50) continue;
+        if (pPrev.dy > drawingHeight + 50 &&
+            pCurr.dy > drawingHeight + 50 &&
+            pNext.dy > drawingHeight + 50)
           continue;
 
         Offset midPrev = (pPrev + pCurr) / 2.0;
