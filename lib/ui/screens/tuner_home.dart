@@ -357,6 +357,24 @@ class _TunerHomeState extends State<TunerHome>
     List<double> sorted = List.from(_pitchHistory)..sort();
     double medianHz = sorted[sorted.length ~/ 2];
 
+    // Electrical noise filter: reduce sensitivity around 60Hz and 120Hz
+    // Apply a damping factor if the frequency is near these common noise frequencies
+    if ((medianHz - 60).abs() < 5 || (medianHz - 120).abs() < 8) {
+      // Require more consistent readings for these frequencies
+      if (_pitchHistory.length < 7) {
+        return; // Need more samples to confirm
+      }
+      // Check if readings are stable
+      double variance = 0;
+      for (var hz in _pitchHistory) {
+        variance += (hz - medianHz).abs();
+      }
+      variance /= _pitchHistory.length;
+      if (variance > 2.0) {
+        return; // Too much variance, likely noise
+      }
+    }
+
     double n = 12 * (log(medianHz / 440) / log(2));
     final currentPreset = _presets[_selectedPresetIndex];
 
@@ -412,7 +430,7 @@ class _TunerHomeState extends State<TunerHome>
     _currentLerpedNote =
         lerpDouble(_currentLerpedNote, n, traceLerpFactor) ?? n;
     _dynamicZoomMultiplier =
-        lerpDouble(_dynamicZoomMultiplier, targetZoomMult, 0.1) ?? 1.0;
+        lerpDouble(_dynamicZoomMultiplier, targetZoomMult, 0.3) ?? 1.0;
 
     _traceHistory.insert(
       0,
@@ -468,6 +486,7 @@ class _TunerHomeState extends State<TunerHome>
               setState(() {
                 _selectedPresetIndex = index;
                 _traceHistory.clear();
+                _dynamicZoomMultiplier = pianoRollZoom;
               });
               _saveSettings();
             },
@@ -483,6 +502,7 @@ class _TunerHomeState extends State<TunerHome>
                           _selectedPresetIndex =
                               _presets.length - 1; // Select the new one
                           _traceHistory.clear();
+                          _dynamicZoomMultiplier = pianoRollZoom;
                         });
                         _saveSettings();
                       },
@@ -496,6 +516,7 @@ class _TunerHomeState extends State<TunerHome>
                   _selectedPresetIndex = AppConstants.defaultPresetIndex;
                 }
                 _traceHistory.clear();
+                _dynamicZoomMultiplier = pianoRollZoom;
               });
               Navigator.pop(context);
               _saveSettings();
