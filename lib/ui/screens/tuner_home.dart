@@ -454,7 +454,7 @@ class _TunerHomeState extends State<TunerHome>
   void _showTuningMenu() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppConstants.tuningMenuBackgroundColor,
+      backgroundColor: Colors.transparent,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(
           top: Radius.circular(AppConstants.tuningMenuBorderRadius),
@@ -522,7 +522,7 @@ class _TunerHomeState extends State<TunerHome>
   void _showSettings() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppConstants.tuningMenuBackgroundColor,
+      backgroundColor: Colors.transparent,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(
