@@ -155,14 +155,7 @@ class _TuningMenuState extends State<TuningMenu> {
     required VoidCallback onTap,
     VoidCallback? onDelete,
   }) {
-    IconData leadingIcon;
-    if (isChromatic) {
-      leadingIcon = Icons.blur_on;
-    } else if (preset.notes.length > 4) {
-      leadingIcon = Icons.piano;
-    } else {
-      leadingIcon = Icons.music_note;
-    }
+    IconData leadingIcon = isChromatic ? Icons.blur_on : Icons.music_note;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
