@@ -28,12 +28,14 @@ class RollingVisualizer extends StatefulWidget {
 class _RollingVisualizerState extends State<RollingVisualizer>
     with SingleTickerProviderStateMixin {
   late Ticker _ticker;
+  late final ValueNotifier<int> _repaintNotifier;
 
   @override
   void initState() {
     super.initState();
-    _ticker = createTicker((elapsed) {
-      if (mounted) setState(() {});
+    _repaintNotifier = ValueNotifier(0);
+    _ticker = createTicker((_) {
+      _repaintNotifier.value++;
     });
     _ticker.start();
   }
@@ -41,6 +43,7 @@ class _RollingVisualizerState extends State<RollingVisualizer>
   @override
   void dispose() {
     _ticker.dispose();
+    _repaintNotifier.dispose();
     super.dispose();
   }
 
@@ -56,8 +59,8 @@ class _RollingVisualizerState extends State<RollingVisualizer>
             widget.zoom,
             widget.filteredNotes,
             scrollSpeed: widget.scrollSpeed,
-            currentTimestamp: DateTime.now().millisecondsSinceEpoch.toDouble(),
             currentCents: widget.currentCents,
+            repaint: _repaintNotifier,
           ),
         );
       },

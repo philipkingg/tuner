@@ -11,7 +11,6 @@ class RollingRollPainter extends CustomPainter {
   final double zoom;
   final List<String> filteredNotes;
   final double scrollSpeed;
-  final double currentTimestamp; // Added for time-based rendering
   final double currentCents;
 
   RollingRollPainter(
@@ -20,9 +19,9 @@ class RollingRollPainter extends CustomPainter {
     this.zoom,
     this.filteredNotes, {
     this.scrollSpeed = 1.0,
-    required this.currentTimestamp,
     required this.currentCents,
-  });
+    Listenable? repaint,
+  }) : super(repaint: repaint);
 
   Color _getColor(double cents) {
     double absCents = cents.abs();
@@ -43,6 +42,8 @@ class RollingRollPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final double currentTimestamp =
+        DateTime.now().millisecondsSinceEpoch.toDouble();
     final double midX = size.width / 2;
     final double stepX = (size.width / 2) * zoom;
     final double drawingHeight = size.height;
@@ -339,9 +340,9 @@ class RollingRollPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(RollingRollPainter old) {
-    return old.currentTimestamp != currentTimestamp ||
-        old.centerNoteIndex != centerNoteIndex ||
+    return old.centerNoteIndex != centerNoteIndex ||
         old.zoom != zoom ||
-        old.history != history;
+        old.history != history ||
+        old.currentCents != currentCents;
   }
 }
