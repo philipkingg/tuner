@@ -105,7 +105,8 @@ class RollingRollPainter extends CustomPainter {
       timestamp: currentTimestamp.toInt(),
     );
 
-    final List<TracePoint> points = [currentPoint, ...history];
+    // history is oldest-first (append-only); reverse so index 0 = most recent
+    final List<TracePoint> points = [currentPoint, ...history.reversed];
 
     if (points.length < 2) return;
 

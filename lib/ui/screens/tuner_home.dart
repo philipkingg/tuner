@@ -436,23 +436,15 @@ class _TunerHomeState extends State<TunerHome>
     _dynamicZoomMultiplier =
         lerpDouble(_dynamicZoomMultiplier, targetZoomMult, 0.3) ?? 1.0;
 
-    _traceHistory.insert(
-      0,
+    _traceHistory.add(
       TracePoint(
         cents: newCents,
         note: _currentLerpedNote,
         timestamp: DateTime.now().millisecondsSinceEpoch,
       ),
     );
-
-    // Prune history based on time? Or Count?
-    // Count is safer for memory, but for visual length:
-    // Visible duration = 5000 / scrollSpeed ms.
-    // If we keep 10 seconds of history, that's safe.
-    // If update rate is 60Hz, 10s = 600 points.
-    // Let's keep a generous count buffer.
     if (_traceHistory.length > AppConstants.maxTracePoints) {
-      _traceHistory.removeLast();
+      _traceHistory.removeAt(0); // remove oldest (front of list)
     }
 
     if (mounted) {
