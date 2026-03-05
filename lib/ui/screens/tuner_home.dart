@@ -49,6 +49,7 @@ class _TunerHomeState extends State<TunerHome>
   int cents = 0;
 
   double _currentLerpedNote = 0.0;
+  double _emaHz = 0.0;
   double _dynamicZoomMultiplier = 1.0;
   bool _isInitialized = false;
   bool _hasMicPermission = true;
@@ -343,7 +344,8 @@ class _TunerHomeState extends State<TunerHome>
         // Confirmed jump
         _lastConfirmedPitch = newPitch;
         _jumpGuardCounter = 0;
-        _pitchHistory.clear(); // Clear history on jump so median doesn't drag
+        _pitchHistory.clear(); // Clear history on jump so EMA doesn't drag
+        _emaHz = 0.0;
       } else {
         _lastConfirmedPitch = newPitch;
         _jumpGuardCounter = 0;
@@ -353,9 +355,14 @@ class _TunerHomeState extends State<TunerHome>
     }
 
     _pitchHistory.add(newPitch);
-    if (_pitchHistory.length > 9) _pitchHistory.removeAt(0); // Increased buffer
-    List<double> sorted = List.from(_pitchHistory)..sort();
-    double medianHz = sorted[sorted.length ~/ 2];
+    if (_pitchHistory.length > 9) _pitchHistory.removeAt(0);
+    // EMA replaces median: output is continuously weighted, never quantized to a discrete sample
+    if (_emaHz == 0.0) {
+      _emaHz = newPitch;
+    } else {
+      _emaHz = AppConstants.emaAlpha * newPitch + (1.0 - AppConstants.emaAlpha) * _emaHz;
+    }
+    final double medianHz = _emaHz;
 
     // Electrical noise filter: reduce sensitivity around 60Hz and 120Hz
     // Apply a damping factor if the frequency is near these common noise frequencies

@@ -14,6 +14,7 @@ class AppConstants {
   static const double defaultSmoothingSpeed = 100.0;
   static const double defaultPianoRollZoom = 0.4;
   static const double defaultTraceLerpFactor = 0.15;
+  static const double emaAlpha = 0.3; // EMA smoothing factor (higher = more responsive, lower = smoother)
   static const double defaultScrollSpeed = 2.0;
   static const VisualMode defaultVisualMode = VisualMode.rollingTrace;
   static const int defaultPresetIndex = 0;
