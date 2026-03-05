@@ -27,12 +27,13 @@ class RollingRollPainter extends CustomPainter {
   Color _getColor(double cents) {
     double absCents = cents.abs();
     if (absCents < 5) return Colors.greenAccent;
-    if (absCents < 20)
+    if (absCents < 20) {
       return Color.lerp(
         Colors.greenAccent,
         Colors.yellowAccent,
         (absCents - 5) / 15,
       )!;
+    }
     return Color.lerp(
       Colors.yellowAccent,
       Colors.redAccent,
@@ -171,8 +172,9 @@ class RollingRollPainter extends CustomPainter {
         if (pPrev.dy < -50 && pCurr.dy < -50 && pNext.dy < -50) continue;
         if (pPrev.dy > drawingHeight + 50 &&
             pCurr.dy > drawingHeight + 50 &&
-            pNext.dy > drawingHeight + 50)
+            pNext.dy > drawingHeight + 50) {
           continue;
+        }
 
         Offset midPrev = (pPrev + pCurr) / 2.0;
         Offset midNext = (pCurr + pNext) / 2.0;
@@ -234,10 +236,11 @@ class RollingRollPainter extends CustomPainter {
         tangent = const Offset(0, 1); // Fallback
       }
 
-      if (tangent.distance == 0)
+      if (tangent.distance == 0) {
         tangent = const Offset(0, 1);
-      else
+      } else {
         tangent = tangent / tangent.distance; // Normalize
+      }
 
       // Normal vector (-y, x)
       Offset normal = Offset(-tangent.dy, tangent.dx);

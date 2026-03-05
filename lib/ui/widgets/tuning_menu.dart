@@ -79,8 +79,9 @@ class _TuningMenuState extends State<TuningMenu> {
               itemBuilder: (context, index) {
                 // Restore button at the end
                 if (index == widget.presets.length) {
-                  if (widget.onRestoreDefaults == null)
+                  if (widget.onRestoreDefaults == null) {
                     return const SizedBox.shrink();
+                  }
                   return _buildRestoreButton();
                 }
 

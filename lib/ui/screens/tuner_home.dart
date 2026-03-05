@@ -447,8 +447,9 @@ class _TunerHomeState extends State<TunerHome>
     // If we keep 10 seconds of history, that's safe.
     // If update rate is 60Hz, 10s = 600 points.
     // Let's keep a generous count buffer.
-    if (_traceHistory.length > AppConstants.maxTracePoints)
+    if (_traceHistory.length > AppConstants.maxTracePoints) {
       _traceHistory.removeLast();
+    }
 
     if (mounted) {
       setState(() {

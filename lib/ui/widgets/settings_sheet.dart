@@ -68,18 +68,24 @@ class _SettingsSheetState extends State<SettingsSheet> {
   @override
   void didUpdateWidget(SettingsSheet oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.visualMode != widget.visualMode)
+    if (oldWidget.visualMode != widget.visualMode) {
       _visualMode = widget.visualMode;
-    if (oldWidget.targetGain != widget.targetGain)
+    }
+    if (oldWidget.targetGain != widget.targetGain) {
       _targetGain = widget.targetGain;
-    if (oldWidget.sensitivity != widget.sensitivity)
+    }
+    if (oldWidget.sensitivity != widget.sensitivity) {
       _sensitivity = widget.sensitivity;
-    if (oldWidget.smoothingSpeed != widget.smoothingSpeed)
+    }
+    if (oldWidget.smoothingSpeed != widget.smoothingSpeed) {
       _smoothingSpeed = widget.smoothingSpeed;
-    if (oldWidget.pianoRollZoom != widget.pianoRollZoom)
+    }
+    if (oldWidget.pianoRollZoom != widget.pianoRollZoom) {
       _pianoRollZoom = widget.pianoRollZoom;
-    if (oldWidget.scrollSpeed != widget.scrollSpeed)
+    }
+    if (oldWidget.scrollSpeed != widget.scrollSpeed) {
       _scrollSpeed = widget.scrollSpeed;
+    }
   }
 
   @override
