@@ -12,5 +12,6 @@ class WavePainter extends CustomPainter {
     }
     canvas.drawPath(path, Paint()..color = Colors.blueAccent..strokeWidth = 3.0..style = PaintingStyle.stroke);
   }
-  @override bool shouldRepaint(covariant CustomPainter old) => true;
+  @override
+  bool shouldRepaint(covariant WavePainter old) => old.points != points;
 }
