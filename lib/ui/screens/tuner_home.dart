@@ -274,10 +274,7 @@ class _TunerHomeState extends State<TunerHome>
         0,
         AppConstants.bufferSize,
       );
-      _audioBuffer.removeRange(
-        0,
-        2048,
-      ); // Leaving overlap. Could be a constant too?
+      _audioBuffer.removeRange(0, AppConstants.audioBufferStride);
       final result = await _pitchDetector.getPitchFromFloatBuffer(
         processingBuffer,
       );

@@ -15,6 +15,7 @@ class AppConstants {
   static const double defaultPianoRollZoom = 0.4;
   static const double defaultTraceLerpFactor = 0.15;
   static const double emaAlpha = 0.3; // EMA smoothing factor (higher = more responsive, lower = smoother)
+  static const int audioBufferStride = 1024; // Samples dropped after each detection (lower = more overlap, higher detection rate)
   static const double defaultScrollSpeed = 2.0;
   static const VisualMode defaultVisualMode = VisualMode.rollingTrace;
   static const int defaultPresetIndex = 0;
