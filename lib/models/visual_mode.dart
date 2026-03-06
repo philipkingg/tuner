@@ -1,1 +1,1 @@
-enum VisualMode { needle, rollingTrace }
+enum VisualMode { needle, rollingTrace, spectrograph }

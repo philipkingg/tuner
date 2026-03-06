@@ -471,6 +471,18 @@ class _SettingsSheetState extends State<SettingsSheet> {
                   },
                 ),
               ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildModeButton(
+                  icon: Icons.graphic_eq_rounded,
+                  label: 'Spectro',
+                  isSelected: _visualMode == VisualMode.spectrograph,
+                  onTap: () {
+                    setState(() => _visualMode = VisualMode.spectrograph);
+                    widget.onVisualModeChanged(VisualMode.spectrograph);
+                  },
+                ),
+              ),
             ],
           ),
         ],

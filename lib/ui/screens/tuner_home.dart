@@ -11,10 +11,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/app_theme.dart';
 import '../../models/tuning_preset.dart';
 import '../../models/visual_mode.dart';
+import '../../models/spectral_frame.dart';
 import '../../utils/note_utils.dart';
 import '../painters/wave_painter.dart';
 import '../painters/cents_meter_painter.dart';
 import '../widgets/rolling_visualizer.dart';
+import '../widgets/spectrograph_visualizer.dart';
 import '../../models/trace_point.dart';
 import '../widgets/settings_sheet.dart';
 import '../widgets/tuning_menu.dart';
@@ -39,6 +41,8 @@ class _TunerHomeState extends State<TunerHome>
   late Animation<double> _needleAnimation;
 
   final List<TracePoint> _traceHistory = [];
+  final List<SpectralFrame> _spectralFrames = [];
+  double _spectroRunningMax = 100.0;
 
   final List<double> _audioBuffer = [];
   List<double> _wavePoints = [];
@@ -275,6 +279,15 @@ class _TunerHomeState extends State<TunerHome>
         AppConstants.bufferSize,
       );
       _audioBuffer.removeRange(0, AppConstants.audioBufferStride);
+      // Spectral analysis runs only in spectrograph mode to save CPU
+      if (_visualMode == VisualMode.spectrograph) {
+        final SpectralFrame frame = _computeSpectralFrame(processingBuffer);
+        _spectralFrames.add(frame);
+        if (_spectralFrames.length > AppConstants.maxSpectralFrames) {
+          _spectralFrames.removeAt(0);
+        }
+      }
+
       final result = await _pitchDetector.getPitchFromFloatBuffer(
         processingBuffer,
       );
@@ -285,6 +298,61 @@ class _TunerHomeState extends State<TunerHome>
       }
     }
     if (mounted) setState(() => _wavePoints = currentChunk.take(80).toList());
+  }
+
+  // --- Spectrograph ---
+
+  double _goertzel(List<double> samples, double frequency) {
+    final double omega =
+        2 * pi * frequency / AppConstants.audioSampleRate;
+    final double cosOmega = cos(omega);
+    final double coeff = 2 * cosOmega;
+    double s1 = 0, s2 = 0;
+    for (final double sample in samples) {
+      final double s0 = sample + coeff * s1 - s2;
+      s2 = s1;
+      s1 = s0;
+    }
+    return sqrt((s1 * s1 + s2 * s2 - coeff * s1 * s2).abs());
+  }
+
+  SpectralFrame _computeSpectralFrame(List<double> samples) {
+    final List<double> rawMags =
+        List<double>.filled(AppConstants.spectroNumBins, 0.0);
+
+    for (int i = 0; i < AppConstants.spectroNumBins; i++) {
+      final int noteN = AppConstants.spectroMinN + i;
+      final double freq = 440.0 * pow(2.0, noteN / 12.0);
+      rawMags[i] = _goertzel(samples, freq);
+    }
+
+    // Update running peak with slow decay so quiet gaps don't blow up the scale
+    final double framePeak = rawMags.reduce(max);
+    if (framePeak > _spectroRunningMax) _spectroRunningMax = framePeak;
+    _spectroRunningMax =
+        (_spectroRunningMax * 0.999).clamp(100.0, double.infinity);
+
+    // Log-scale normalisation: log₁₀(1 + x*9) maps [0, max] → [0, 1]
+    int loudestBin = 0;
+    double maxNorm = 0;
+    final List<double> normalized =
+        List<double>.filled(AppConstants.spectroNumBins, 0.0);
+    for (int i = 0; i < rawMags.length; i++) {
+      final double v =
+          (log(1.0 + rawMags[i] / _spectroRunningMax * 9.0) / log(10.0))
+              .clamp(0.0, 1.0);
+      normalized[i] = v;
+      if (v > maxNorm) {
+        maxNorm = v;
+        loudestBin = i;
+      }
+    }
+
+    return SpectralFrame(
+      magnitudes: normalized,
+      loudestBin: loudestBin,
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+    );
   }
 
   // Stabilization State
@@ -658,29 +726,35 @@ class _TunerHomeState extends State<TunerHome>
               clipBehavior: Clip.hardEdge,
               decoration: BoxDecoration(color: tc.background),
               child:
-                  _visualMode == VisualMode.needle
-                      ? Center(
-                        child: SizedBox(
-                          height: 120,
-                          width: double.infinity,
-                          child: CustomPaint(
-                            painter: WavePainter(
-                              _wavePoints,
-                              color: tc.primary,
-                            ),
+                  switch (_visualMode) {
+                    VisualMode.needle => Center(
+                      child: SizedBox(
+                        height: 120,
+                        width: double.infinity,
+                        child: CustomPaint(
+                          painter: WavePainter(
+                            _wavePoints,
+                            color: tc.primary,
                           ),
                         ),
-                      )
-                      : RollingVisualizer(
-                        history: _traceHistory,
-                        currentCents: cents.toDouble(),
-                        centerNoteIndex: _currentLerpedNote,
-                        zoom: pianoRollZoom * _dynamicZoomMultiplier,
-                        scrollSpeed: scrollSpeed,
-                        filteredNotes: currentPreset.notes,
-                        gridLineColor: tc.border,
-                        gridLineActiveColor: tc.gridLineActive,
                       ),
+                    ),
+                    VisualMode.rollingTrace => RollingVisualizer(
+                      history: _traceHistory,
+                      currentCents: cents.toDouble(),
+                      centerNoteIndex: _currentLerpedNote,
+                      zoom: pianoRollZoom * _dynamicZoomMultiplier,
+                      scrollSpeed: scrollSpeed,
+                      filteredNotes: currentPreset.notes,
+                      gridLineColor: tc.border,
+                      gridLineActiveColor: tc.gridLineActive,
+                    ),
+                    VisualMode.spectrograph => SpectrographVisualizer(
+                      frames: _spectralFrames,
+                      primaryColor: tc.primary,
+                      backgroundColor: tc.background,
+                    ),
+                  },
             ),
           ),
           _buildCentsMeter(tc, isCorrect),

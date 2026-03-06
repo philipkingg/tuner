@@ -35,6 +35,13 @@ class AppConstants {
   static const double rollingWaveFadeTopHeight =
       150.0; // The height of the fade zone at the top
 
+  // Spectrograph Configuration
+  static const int spectroMinN = -33; // C2 (~65 Hz) - lowest displayed note
+  static const int spectroMaxN = 27;  // C7 (~2093 Hz) - highest displayed note
+  static const int spectroNumBins = spectroMaxN - spectroMinN + 1; // 61 bins
+  static const int spectroDefaultVisibleSemitones = 24; // 2 octaves visible
+  static const int maxSpectralFrames = 500;
+
   // Default Presets
   static final List<TuningPreset> defaultPresets = [
     TuningPreset(name: "Chromatic", notes: []),
