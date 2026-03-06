@@ -279,12 +279,16 @@ class _TunerHomeState extends State<TunerHome>
         AppConstants.bufferSize,
       );
       _audioBuffer.removeRange(0, AppConstants.audioBufferStride);
-      // Spectral analysis runs only in spectrograph mode to save CPU
+      // Spectral analysis: only in spectrograph mode, every other cycle (~21 fps)
       if (_visualMode == VisualMode.spectrograph) {
-        final SpectralFrame frame = _computeSpectralFrame(processingBuffer);
-        _spectralFrames.add(frame);
-        if (_spectralFrames.length > AppConstants.maxSpectralFrames) {
-          _spectralFrames.removeAt(0);
+        _spectroSkip++;
+        if (_spectroSkip >= 2) {
+          _spectroSkip = 0;
+          final SpectralFrame frame = _computeSpectralFrame(processingBuffer);
+          _spectralFrames.add(frame);
+          if (_spectralFrames.length > AppConstants.maxSpectralFrames) {
+            _spectralFrames.removeAt(0);
+          }
         }
       }
 
@@ -302,14 +306,26 @@ class _TunerHomeState extends State<TunerHome>
 
   // --- Spectrograph ---
 
-  double _goertzel(List<double> samples, double frequency) {
-    final double omega =
-        2 * pi * frequency / AppConstants.audioSampleRate;
-    final double cosOmega = cos(omega);
-    final double coeff = 2 * cosOmega;
+  // Goertzel coefficients precomputed once (2*cos(2π·f/sampleRate) per bin).
+  // Using a smaller window (2048 samples) halves CPU vs the 4096 pitch window.
+  static const int _spectroWindowSize = 2048;
+  static final List<double> _spectroCoeffs = List<double>.generate(
+    AppConstants.spectroNumBins,
+    (i) {
+      final int noteN = AppConstants.spectroMinN + i;
+      final double freq = 440.0 * pow(2.0, noteN / 12.0);
+      final double omega = 2 * pi * freq / AppConstants.audioSampleRate;
+      return 2 * cos(omega);
+    },
+  );
+
+  // Skip counter — compute spectro every other detection cycle (~21 fps).
+  int _spectroSkip = 0;
+
+  double _goertzelCoeff(List<double> samples, int n, double coeff) {
     double s1 = 0, s2 = 0;
-    for (final double sample in samples) {
-      final double s0 = sample + coeff * s1 - s2;
+    for (int i = 0; i < n; i++) {
+      final double s0 = samples[i] + coeff * s1 - s2;
       s2 = s1;
       s1 = s0;
     }
@@ -317,22 +333,21 @@ class _TunerHomeState extends State<TunerHome>
   }
 
   SpectralFrame _computeSpectralFrame(List<double> samples) {
+    final int n = samples.length.clamp(0, _spectroWindowSize);
     final List<double> rawMags =
         List<double>.filled(AppConstants.spectroNumBins, 0.0);
 
     for (int i = 0; i < AppConstants.spectroNumBins; i++) {
-      final int noteN = AppConstants.spectroMinN + i;
-      final double freq = 440.0 * pow(2.0, noteN / 12.0);
-      rawMags[i] = _goertzel(samples, freq);
+      rawMags[i] = _goertzelCoeff(samples, n, _spectroCoeffs[i]);
     }
 
-    // Update running peak with slow decay so quiet gaps don't blow up the scale
+    // Adaptive running peak with slow decay
     final double framePeak = rawMags.reduce(max);
     if (framePeak > _spectroRunningMax) _spectroRunningMax = framePeak;
     _spectroRunningMax =
         (_spectroRunningMax * 0.999).clamp(100.0, double.infinity);
 
-    // Log-scale normalisation: log₁₀(1 + x*9) maps [0, max] → [0, 1]
+    // Log-scale normalisation: log₁₀(1 + x·9) → [0, 1]
     int loudestBin = 0;
     double maxNorm = 0;
     final List<double> normalized =
