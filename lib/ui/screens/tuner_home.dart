@@ -83,9 +83,7 @@ class _TunerHomeState extends State<TunerHome>
     );
     _needleAnimation = Tween<double>(begin: 0, end: 0).animate(
       CurvedAnimation(parent: _needleController, curve: Curves.easeOutCubic),
-    )..addListener(() {
-      if (mounted) setState(() => cents = _needleAnimation.value.round());
-    });
+    );
     _initApp();
   }
 
@@ -452,6 +450,7 @@ class _TunerHomeState extends State<TunerHome>
         hz = medianHz;
         note = targetName;
         octave = targetOctave;
+        cents = newCents.round();
       });
       _needleAnimation = Tween<double>(
         begin: _needleAnimation.value,
@@ -752,24 +751,30 @@ class _TunerHomeState extends State<TunerHome>
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
-            child: Column(
-              children: [
-                SizedBox(
-                  height: 40,
-                  width: double.infinity,
-                  child: CustomPaint(
-                    painter: CentsMeterPainter(cents.toDouble()),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  "${cents.abs()} cents ${cents > 0 ? 'sharp' : 'flat'}",
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: isCorrect ? Colors.greenAccent : Colors.white70,
-                  ),
-                ),
-              ],
+            child: AnimatedBuilder(
+              animation: _needleAnimation,
+              builder: (context, child) {
+                final int animatedCents = _needleAnimation.value.round();
+                return Column(
+                  children: [
+                    SizedBox(
+                      height: 40,
+                      width: double.infinity,
+                      child: CustomPaint(
+                        painter: CentsMeterPainter(animatedCents.toDouble()),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      "${animatedCents.abs()} cents ${animatedCents > 0 ? 'sharp' : 'flat'}",
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: isCorrect ? Colors.greenAccent : Colors.white70,
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ],
