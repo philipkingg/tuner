@@ -12,6 +12,8 @@ class RollingRollPainter extends CustomPainter {
   final List<String> filteredNotes;
   final double scrollSpeed;
   final double currentCents;
+  final Color gridLineColor;
+  final Color gridLineActiveColor;
 
   RollingRollPainter(
     this.history,
@@ -20,6 +22,8 @@ class RollingRollPainter extends CustomPainter {
     this.filteredNotes, {
     this.scrollSpeed = 1.0,
     required this.currentCents,
+    this.gridLineColor = const Color(0xFF3D2D1F),
+    this.gridLineActiveColor = const Color(0xFFC8892F),
     Listenable? repaint,
   }) : super(repaint: repaint);
 
@@ -64,20 +68,12 @@ class RollingRollPainter extends CustomPainter {
     } else {
       for (var noteStr in filteredNotes) {
         if (NoteUtils.isGeneric(noteStr)) {
-          // Draw all instances of this note in visible range
           int range = (3 / zoom).ceil().clamp(3, 24);
           int startN = (centerNoteIndex - range).floor();
           int endN = (centerNoteIndex + range).ceil();
 
           int targetIdx = NoteUtils.noteNames.indexOf(noteStr);
           if (targetIdx == -1) continue;
-
-          // Iterate octaves
-          // n = (noteIdx + 12*oct) - 57
-          // We want n in [startN, endN]
-          // startN <= (noteIdx + 12*oct - 57) <= endN
-          // startN + 57 - noteIdx <= 12*oct <= endN + 57 - noteIdx
-          // (startN + 57 - noteIdx)/12 <= oct <= (endN + 57 - noteIdx)/12
 
           int minOct = ((startN + 57 - targetIdx) / 12.0).floor();
           int maxOct = ((endN + 57 - targetIdx) / 12.0).ceil();
@@ -101,8 +97,7 @@ class RollingRollPainter extends CustomPainter {
     // Unified List: [Current, ...History]
     final TracePoint currentPoint = TracePoint(
       cents: currentCents,
-      note:
-          centerNoteIndex, // The pen is at the center index (current lerped note)
+      note: centerNoteIndex,
       timestamp: currentTimestamp.toInt(),
     );
 
@@ -148,7 +143,6 @@ class RollingRollPainter extends CustomPainter {
         // Linear subdivision P0 -> Mid01
         const int sub = 5;
         for (int s = 0; s <= sub; s++) {
-          // 0 to sub inclusive
           double t = s / sub;
           double x = p0.dx + (mid01.dx - p0.dx) * t;
           double y = p0.dy + (mid01.dy - p0.dy) * t;
@@ -199,10 +193,7 @@ class RollingRollPainter extends CustomPainter {
               (2 * invT * t * pCurr.dy) +
               (t * t * midNext.dy);
 
-          // Linear cents interp?
-          // Or Quadratic? Let's use linear for now.
           double c = startCents + (endCents - startCents) * t;
-          // Technically we pass through pCurr control point? No, curve doesn't pass through control point.
 
           addPathPoint(Offset(x, y), c);
         }
@@ -235,13 +226,13 @@ class RollingRollPainter extends CustomPainter {
       } else if (i > 0) {
         tangent = current - (pathPoints[i - 1]['pos'] as Offset);
       } else {
-        tangent = const Offset(0, 1); // Fallback
+        tangent = const Offset(0, 1);
       }
 
       if (tangent.distance == 0) {
         tangent = const Offset(0, 1);
       } else {
-        tangent = tangent / tangent.distance; // Normalize
+        tangent = tangent / tangent.distance;
       }
 
       // Normal vector (-y, x)
@@ -263,16 +254,11 @@ class RollingRollPainter extends CustomPainter {
       colors.add(c);
       colors.add(c);
 
-      // Add indices for 2 triangles forming a quad (strip)
-      // Vertices added: 2*i, 2*i+1
-      // Previous were: 2*(i-1), 2*(i-1)+1
       if (i > 0) {
         int base = (i - 1) * 2;
-        // Triangle 1: Base, Base+1, Base+2
         float32Indices.add(base);
         float32Indices.add(base + 1);
         float32Indices.add(base + 2);
-        // Triangle 2: Base+1, Base+3, Base+2
         float32Indices.add(base + 1);
         float32Indices.add(base + 3);
         float32Indices.add(base + 2);
@@ -293,7 +279,7 @@ class RollingRollPainter extends CustomPainter {
       Offset(midX, 0),
       Offset(midX, drawingHeight),
       Paint()
-        ..color = Colors.white24
+        ..color = gridLineColor.withValues(alpha: 0.8)
         ..strokeWidth = 1.5,
     );
   }
@@ -312,11 +298,10 @@ class RollingRollPainter extends CustomPainter {
       Offset(xPos, 0),
       Offset(xPos, drawingHeight),
       Paint()
-        ..color =
-            isActive
-                ? Colors.blueAccent.withValues(alpha: 0.6)
-                : Colors.white.withValues(alpha: 0.08)
-        ..strokeWidth = isActive ? 3 : 1,
+        ..color = isActive
+            ? gridLineActiveColor.withValues(alpha: 0.5)
+            : gridLineColor.withValues(alpha: 0.6)
+        ..strokeWidth = isActive ? 2.5 : 1,
     );
 
     int noteIdx = ((n + 57) % 12).toInt();
@@ -324,16 +309,18 @@ class RollingRollPainter extends CustomPainter {
     String label = "${NoteUtils.noteNames[noteIdx]}$oct";
 
     TextPainter(
-        text: TextSpan(
-          text: label,
-          style: TextStyle(
-            color: isActive ? Colors.blueAccent : Colors.white24,
-            fontSize: isActive ? 14 : 11,
-            fontWeight: FontWeight.bold,
-          ),
+      text: TextSpan(
+        text: label,
+        style: TextStyle(
+          color: isActive
+              ? gridLineActiveColor.withValues(alpha: 0.9)
+              : gridLineColor.withValues(alpha: 0.8),
+          fontSize: isActive ? 13 : 10,
+          fontWeight: FontWeight.w600,
         ),
-        textDirection: TextDirection.ltr,
-      )
+      ),
+      textDirection: TextDirection.ltr,
+    )
       ..layout()
       ..paint(canvas, Offset(xPos - 8, drawingHeight - 30));
   }
@@ -343,6 +330,8 @@ class RollingRollPainter extends CustomPainter {
     return old.centerNoteIndex != centerNoteIndex ||
         old.zoom != zoom ||
         old.history != history ||
-        old.currentCents != currentCents;
+        old.currentCents != currentCents ||
+        old.gridLineColor != gridLineColor ||
+        old.gridLineActiveColor != gridLineActiveColor;
   }
 }

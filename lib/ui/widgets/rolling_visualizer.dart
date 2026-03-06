@@ -6,10 +6,12 @@ import '../painters/rolling_roll_painter.dart';
 class RollingVisualizer extends StatefulWidget {
   final List<TracePoint> history;
   final double currentCents;
-  final double centerNoteIndex; // Added this parameter to match painter needs
+  final double centerNoteIndex;
   final double zoom;
   final double scrollSpeed;
   final List<String> filteredNotes;
+  final Color gridLineColor;
+  final Color gridLineActiveColor;
 
   const RollingVisualizer({
     super.key,
@@ -19,6 +21,8 @@ class RollingVisualizer extends StatefulWidget {
     required this.zoom,
     required this.scrollSpeed,
     required this.filteredNotes,
+    this.gridLineColor = const Color(0xFF3D2D1F),
+    this.gridLineActiveColor = const Color(0xFFC8892F),
   });
 
   @override
@@ -60,6 +64,8 @@ class _RollingVisualizerState extends State<RollingVisualizer>
             widget.filteredNotes,
             scrollSpeed: widget.scrollSpeed,
             currentCents: widget.currentCents,
+            gridLineColor: widget.gridLineColor,
+            gridLineActiveColor: widget.gridLineActiveColor,
             repaint: _repaintNotifier,
           ),
         );

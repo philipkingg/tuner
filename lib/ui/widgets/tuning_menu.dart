@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import '../../models/app_theme.dart';
 import '../../models/tuning_preset.dart';
 
 class TuningMenu extends StatefulWidget {
+  final AppThemeColors themeColors;
   final List<TuningPreset> presets;
   final int selectedIndex;
   final ValueChanged<int> onPresetSelected;
@@ -11,6 +13,7 @@ class TuningMenu extends StatefulWidget {
 
   const TuningMenu({
     super.key,
+    required this.themeColors,
     required this.presets,
     required this.selectedIndex,
     required this.onPresetSelected,
@@ -26,58 +29,77 @@ class TuningMenu extends StatefulWidget {
 class _TuningMenuState extends State<TuningMenu> {
   bool _isConfirmingRestore = false;
 
+  AppThemeColors get tc => widget.themeColors;
+
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1C1C1E).withValues(alpha: 0.75),
+        color: tc.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        border: Border(top: BorderSide(color: tc.border, width: 1)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Drag handle
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 4),
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: tc.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
           // Header
           Padding(
-            padding: const EdgeInsets.fromLTRB(24, 64, 24, 24),
+            padding: const EdgeInsets.fromLTRB(24, 16, 16, 16),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
                   children: [
                     Icon(
-                      Icons.music_note,
-                      color: Colors.greenAccent.shade400,
-                      size: 24,
+                      Icons.music_note_rounded,
+                      color: tc.primary,
+                      size: 20,
                     ),
-                    const SizedBox(width: 12),
-                    const Text(
+                    const SizedBox(width: 10),
+                    Text(
                       'Tunings',
                       style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: tc.textPrimary,
+                        letterSpacing: -0.3,
                       ),
                     ),
                   ],
                 ),
                 IconButton(
                   onPressed: widget.onCreateNew,
-                  icon: const Icon(Icons.add_circle_outline, size: 24),
-                  color: Colors.greenAccent.shade400,
+                  icon: Icon(
+                    Icons.add_circle_outline_rounded,
+                    size: 22,
+                    color: tc.primary,
+                  ),
                   tooltip: 'New Tuning',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                 ),
               ],
             ),
           ),
 
-          // Presets List
           Flexible(
             child: ListView.builder(
               shrinkWrap: true,
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              itemCount: widget.presets.length + 1, // +1 for restore button
+              itemCount: widget.presets.length + 1,
               itemBuilder: (context, index) {
-                // Restore button at the end
                 if (index == widget.presets.length) {
                   if (widget.onRestoreDefaults == null) {
                     return const SizedBox.shrink();
@@ -113,10 +135,10 @@ class _TuningMenuState extends State<TuningMenu> {
 
   Widget _buildRestoreButton() {
     return Container(
-      margin: const EdgeInsets.only(top: 8, bottom: 8),
+      margin: const EdgeInsets.only(top: 4, bottom: 4),
       child: SizedBox(
         width: double.infinity,
-        child: FilledButton(
+        child: OutlinedButton(
           onPressed: () {
             if (_isConfirmingRestore) {
               widget.onRestoreDefaults!();
@@ -128,20 +150,23 @@ class _TuningMenuState extends State<TuningMenu> {
               });
             }
           },
-          style: FilledButton.styleFrom(
-            backgroundColor:
-                _isConfirmingRestore
-                    ? Colors.redAccent
-                    : const Color(0xFF1E1E20),
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 16),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: _isConfirmingRestore
+                ? const Color(0xFFFF453A)
+                : tc.textSecondary,
+            side: BorderSide(
+              color: _isConfirmingRestore
+                  ? const Color(0xFFFF453A).withValues(alpha: 0.5)
+                  : tc.border,
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 14),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
           ),
           child: Text(
-            _isConfirmingRestore ? 'Are you sure?' : 'Restore Defaults',
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            _isConfirmingRestore ? 'Tap again to confirm' : 'Restore Defaults',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
           ),
         ),
       ),
@@ -156,47 +181,48 @@ class _TuningMenuState extends State<TuningMenu> {
     required VoidCallback onTap,
     VoidCallback? onDelete,
   }) {
-    IconData leadingIcon = isChromatic ? Icons.blur_on : Icons.music_note;
+    final IconData leadingIcon =
+        isChromatic ? Icons.blur_on_rounded : Icons.music_note_rounded;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E20),
+        color: isSelected
+            ? tc.primary.withValues(alpha: 0.08)
+            : tc.surfaceContainer,
         borderRadius: BorderRadius.circular(12),
-        border:
-            isSelected
-                ? Border.all(color: Colors.greenAccent.shade700, width: 2)
-                : null,
+        border: Border.all(
+          color: isSelected ? tc.primary.withValues(alpha: 0.5) : tc.border,
+          width: isSelected ? 1.5 : 1,
+        ),
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),
+          splashColor: tc.primary.withValues(alpha: 0.08),
+          highlightColor: tc.primary.withValues(alpha: 0.04),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               children: [
-                // Leading Icon
+                // Leading icon container
                 Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color:
-                        isSelected
-                            ? Colors.greenAccent.shade700.withValues(alpha: 0.2)
-                            : const Color(0xFF1C1C1E),
+                    color: isSelected
+                        ? tc.primary.withValues(alpha: 0.15)
+                        : tc.border.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     leadingIcon,
-                    color:
-                        isSelected
-                            ? Colors.greenAccent.shade400
-                            : Colors.white70,
-                    size: 20,
+                    color: isSelected ? tc.primary : tc.textSecondary,
+                    size: 18,
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 14),
 
                 // Content
                 Expanded(
@@ -205,20 +231,20 @@ class _TuningMenuState extends State<TuningMenu> {
                     children: [
                       Text(
                         preset.name,
-                        style: const TextStyle(
-                          fontSize: 16,
+                        style: TextStyle(
+                          fontSize: 15,
                           fontWeight: FontWeight.w600,
-                          color: Colors.white,
+                          color: tc.textPrimary,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 2),
                       Text(
                         preset.notes.isEmpty
                             ? 'All notes'
-                            : preset.notes.join(' • '),
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Colors.white60,
+                            : preset.notes.join(' · '),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: tc.textMuted,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -233,27 +259,27 @@ class _TuningMenuState extends State<TuningMenu> {
                   children: [
                     if (isSelected)
                       Container(
-                        padding: const EdgeInsets.all(6),
+                        padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
-                          color: Colors.greenAccent.shade700,
+                          color: tc.primary,
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: const Icon(
-                          Icons.check,
+                          Icons.check_rounded,
                           color: Colors.white,
-                          size: 16,
+                          size: 14,
                         ),
                       ),
                     if (onDelete != null) ...[
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       IconButton(
                         onPressed: () {
                           onDelete();
                           Navigator.pop(context);
                         },
-                        icon: const Icon(Icons.delete_outline),
-                        color: Colors.redAccent,
-                        iconSize: 20,
+                        icon: const Icon(Icons.delete_outline_rounded),
+                        color: const Color(0xFFFF453A).withValues(alpha: 0.7),
+                        iconSize: 18,
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(
                           minWidth: 32,

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import '../../models/app_theme.dart';
 import '../../models/visual_mode.dart';
+import '../../main.dart';
 
 class SettingsSheet extends StatefulWidget {
+  final AppThemeColors themeColors;
   final VisualMode visualMode;
   final double targetGain;
   final double sensitivity;
@@ -9,6 +12,8 @@ class SettingsSheet extends StatefulWidget {
   final double pianoRollZoom;
   final double traceLerpFactor;
   final double scrollSpeed;
+  final AppColorTheme selectedColorTheme;
+  final ValueChanged<AppColorTheme> onColorThemeChanged;
   final ValueChanged<VisualMode> onVisualModeChanged;
   final ValueChanged<double> onTargetGainChanged;
   final ValueChanged<double> onSensitivityChanged;
@@ -22,6 +27,7 @@ class SettingsSheet extends StatefulWidget {
 
   const SettingsSheet({
     super.key,
+    required this.themeColors,
     required this.visualMode,
     required this.targetGain,
     required this.sensitivity,
@@ -29,6 +35,8 @@ class SettingsSheet extends StatefulWidget {
     required this.pianoRollZoom,
     required this.traceLerpFactor,
     required this.scrollSpeed,
+    required this.selectedColorTheme,
+    required this.onColorThemeChanged,
     required this.onVisualModeChanged,
     required this.onTargetGainChanged,
     required this.onSensitivityChanged,
@@ -52,6 +60,7 @@ class _SettingsSheetState extends State<SettingsSheet> {
   late double _smoothingSpeed;
   late double _pianoRollZoom;
   late double _scrollSpeed;
+  late AppColorTheme _selectedColorTheme;
   bool _isConfirmingReset = false;
 
   @override
@@ -63,58 +72,81 @@ class _SettingsSheetState extends State<SettingsSheet> {
     _smoothingSpeed = widget.smoothingSpeed;
     _pianoRollZoom = widget.pianoRollZoom;
     _scrollSpeed = widget.scrollSpeed;
+    _selectedColorTheme = widget.selectedColorTheme;
+    appThemeNotifier.addListener(_onThemeChange);
+  }
+
+  @override
+  void dispose() {
+    appThemeNotifier.removeListener(_onThemeChange);
+    super.dispose();
+  }
+
+  void _onThemeChange() {
+    if (mounted) setState(() {});
   }
 
   @override
   void didUpdateWidget(SettingsSheet oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.visualMode != widget.visualMode) {
-      _visualMode = widget.visualMode;
-    }
-    if (oldWidget.targetGain != widget.targetGain) {
-      _targetGain = widget.targetGain;
-    }
-    if (oldWidget.sensitivity != widget.sensitivity) {
-      _sensitivity = widget.sensitivity;
-    }
-    if (oldWidget.smoothingSpeed != widget.smoothingSpeed) {
-      _smoothingSpeed = widget.smoothingSpeed;
-    }
-    if (oldWidget.pianoRollZoom != widget.pianoRollZoom) {
-      _pianoRollZoom = widget.pianoRollZoom;
-    }
-    if (oldWidget.scrollSpeed != widget.scrollSpeed) {
-      _scrollSpeed = widget.scrollSpeed;
-    }
+    if (oldWidget.visualMode != widget.visualMode) _visualMode = widget.visualMode;
+    if (oldWidget.targetGain != widget.targetGain) _targetGain = widget.targetGain;
+    if (oldWidget.sensitivity != widget.sensitivity) _sensitivity = widget.sensitivity;
+    if (oldWidget.smoothingSpeed != widget.smoothingSpeed) _smoothingSpeed = widget.smoothingSpeed;
+    if (oldWidget.pianoRollZoom != widget.pianoRollZoom) _pianoRollZoom = widget.pianoRollZoom;
+    if (oldWidget.scrollSpeed != widget.scrollSpeed) _scrollSpeed = widget.scrollSpeed;
+    if (oldWidget.selectedColorTheme != widget.selectedColorTheme) _selectedColorTheme = widget.selectedColorTheme;
   }
+
+  AppThemeColors get tc => AppThemeColors.fromType(appThemeNotifier.value);
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1C1C1E).withValues(alpha: 0.25),
+        color: tc.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        border: Border(top: BorderSide(color: tc.border, width: 1)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Drag handle
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 4),
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: tc.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
           // Header
           Padding(
-            padding: const EdgeInsets.fromLTRB(24, 64, 24, 24),
+            padding: const EdgeInsets.fromLTRB(24, 20, 16, 16),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   'Settings',
                   style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: tc.textPrimary,
+                    letterSpacing: -0.3,
                   ),
                 ),
                 IconButton(
                   onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close, color: Colors.white70),
+                  icon: Icon(
+                    Icons.close_rounded,
+                    color: tc.textSecondary,
+                    size: 20,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                 ),
               ],
             ),
@@ -122,24 +154,26 @@ class _SettingsSheetState extends State<SettingsSheet> {
 
           Flexible(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Permissions Warning
                   if (!widget.hasMicPermission) _buildPermissionWarning(),
 
-                  // Display Section
+                  // Appearance Section
                   _buildSection(
-                    icon: Icons.visibility_outlined,
-                    title: 'Display',
-                    children: [_buildVisualModeSelector()],
+                    icon: Icons.palette_outlined,
+                    title: 'Appearance',
+                    children: [
+                      _buildThemeSelector(),
+                      _buildVisualModeSelector(),
+                    ],
                   ),
 
                   // Rolling Wave Section
                   if (_visualMode == VisualMode.rollingTrace)
                     _buildSection(
-                      icon: Icons.waves,
+                      icon: Icons.waves_rounded,
                       title: 'Rolling Wave',
                       children: [
                         _buildSliderRow(
@@ -169,7 +203,7 @@ class _SettingsSheetState extends State<SettingsSheet> {
 
                   // Audio Section
                   _buildSection(
-                    icon: Icons.tune,
+                    icon: Icons.tune_rounded,
                     title: 'Audio',
                     children: [
                       _buildSliderRow(
@@ -208,9 +242,7 @@ class _SettingsSheetState extends State<SettingsSheet> {
                     ],
                   ),
 
-                  const SizedBox(height: 8),
-
-                  // Reset Button
+                  const SizedBox(height: 4),
                   _buildResetButton(),
                 ],
               ),
@@ -223,46 +255,52 @@ class _SettingsSheetState extends State<SettingsSheet> {
 
   Widget _buildPermissionWarning() {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.redAccent.withValues(alpha: 0.15),
+        color: const Color(0xFFFF453A).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
+        border: Border.all(
+          color: const Color(0xFFFF453A).withValues(alpha: 0.25),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(
             children: [
-              Icon(Icons.mic_off, color: Colors.redAccent, size: 20),
+              Icon(Icons.mic_off_rounded, color: Color(0xFFFF453A), size: 18),
               SizedBox(width: 8),
               Text(
                 'Microphone Access Required',
                 style: TextStyle(
-                  color: Colors.redAccent,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
+                  color: Color(0xFFFF453A),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          const Text(
+          const SizedBox(height: 6),
+          Text(
             'Grant microphone permission to use the tuner.',
-            style: TextStyle(color: Colors.white70, fontSize: 13),
+            style: TextStyle(color: tc.textSecondary, fontSize: 12),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
               onPressed: widget.onOpenSettings,
-              icon: const Icon(Icons.settings, size: 18),
+              icon: const Icon(Icons.settings_outlined, size: 16),
               label: const Text('Open Settings'),
               style: FilledButton.styleFrom(
-                backgroundColor: Colors.redAccent,
+                backgroundColor: const Color(0xFFFF453A),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                textStyle: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),
@@ -277,33 +315,121 @@ class _SettingsSheetState extends State<SettingsSheet> {
     required List<Widget> children,
   }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E20),
-        borderRadius: BorderRadius.circular(12),
+        color: tc.surfaceContainer,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: tc.border, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
             child: Row(
               children: [
-                Icon(icon, size: 20, color: Colors.white70),
+                Icon(icon, size: 16, color: tc.primary),
                 const SizedBox(width: 8),
                 Text(
                   title,
-                  style: const TextStyle(
-                    fontSize: 14,
+                  style: TextStyle(
+                    fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: Colors.white70,
-                    letterSpacing: 0.5,
+                    color: tc.textSecondary,
+                    letterSpacing: 0.4,
                   ),
                 ),
               ],
             ),
           ),
+          Divider(height: 1, color: tc.border),
           ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildThemeSelector() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Color Theme',
+            style: TextStyle(fontSize: 14, color: tc.textPrimary),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: AppColorTheme.values.map((themeType) {
+              final themeColors = AppThemeColors.fromType(themeType);
+              final isSelected = _selectedColorTheme == themeType;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() => _selectedColorTheme = themeType);
+                    widget.onColorThemeChanged(themeType);
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: EdgeInsets.only(
+                      right: themeType == AppColorTheme.earthy ? 8 : 0,
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? tc.primary.withValues(alpha: 0.12)
+                          : tc.surface,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isSelected ? tc.primary : tc.border,
+                        width: isSelected ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Color swatch dots
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: themeColors.background,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: themeColors.primary,
+                              width: 2,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          themeColors.displayName,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: isSelected ? tc.primary : tc.textSecondary,
+                          ),
+                        ),
+                        if (isSelected) ...[
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.check_rounded,
+                            size: 14,
+                            color: tc.primary,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 8),
         ],
       ),
     );
@@ -311,31 +437,41 @@ class _SettingsSheetState extends State<SettingsSheet> {
 
   Widget _buildVisualModeSelector() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: _buildModeButton(
-              icon: Icons.waves,
-              label: 'Wave',
-              isSelected: _visualMode == VisualMode.needle,
-              onTap: () {
-                setState(() => _visualMode = VisualMode.needle);
-                widget.onVisualModeChanged(VisualMode.needle);
-              },
-            ),
+          Text(
+            'Visualizer',
+            style: TextStyle(fontSize: 14, color: tc.textPrimary),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _buildModeButton(
-              icon: Icons.linear_scale,
-              label: 'Roll',
-              isSelected: _visualMode == VisualMode.rollingTrace,
-              onTap: () {
-                setState(() => _visualMode = VisualMode.rollingTrace);
-                widget.onVisualModeChanged(VisualMode.rollingTrace);
-              },
-            ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _buildModeButton(
+                  icon: Icons.waves_rounded,
+                  label: 'Wave',
+                  isSelected: _visualMode == VisualMode.needle,
+                  onTap: () {
+                    setState(() => _visualMode = VisualMode.needle);
+                    widget.onVisualModeChanged(VisualMode.needle);
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildModeButton(
+                  icon: Icons.linear_scale_rounded,
+                  label: 'Roll',
+                  isSelected: _visualMode == VisualMode.rollingTrace,
+                  onTap: () {
+                    setState(() => _visualMode = VisualMode.rollingTrace);
+                    widget.onVisualModeChanged(VisualMode.rollingTrace);
+                  },
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -352,16 +488,13 @@ class _SettingsSheetState extends State<SettingsSheet> {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.only(top: 12, bottom: 12),
+        padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color:
-              isSelected
-                  ? Colors.greenAccent.shade700.withOpacity(0.2)
-                  : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
+          color: isSelected ? tc.primary.withValues(alpha: 0.12) : tc.surface,
+          borderRadius: BorderRadius.circular(9),
           border: Border.all(
-            color: isSelected ? Colors.greenAccent.shade700 : Colors.white12,
-            width: 1.5,
+            color: isSelected ? tc.primary : tc.border,
+            width: isSelected ? 1.5 : 1,
           ),
         ),
         child: Row(
@@ -369,16 +502,16 @@ class _SettingsSheetState extends State<SettingsSheet> {
           children: [
             Icon(
               icon,
-              size: 18,
-              color: isSelected ? Colors.greenAccent.shade400 : Colors.white70,
+              size: 16,
+              color: isSelected ? tc.primary : tc.textSecondary,
             ),
             const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: isSelected ? Colors.white : Colors.white70,
+                color: isSelected ? tc.primary : tc.textSecondary,
               ),
             ),
           ],
@@ -396,7 +529,7 @@ class _SettingsSheetState extends State<SettingsSheet> {
     required ValueChanged<double> onChanged,
   }) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -405,34 +538,36 @@ class _SettingsSheetState extends State<SettingsSheet> {
             children: [
               Text(
                 label,
-                style: const TextStyle(fontSize: 15, color: Colors.white),
+                style: TextStyle(fontSize: 14, color: tc.textPrimary),
               ),
-              Text(
-                displayValue,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.greenAccent.shade400,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: tc.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  displayValue,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: tc.primary,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           SliderTheme(
             data: SliderThemeData(
-              activeTrackColor: Colors.greenAccent.shade700,
-              inactiveTrackColor: Colors.white12,
-              thumbColor: Colors.white,
-              overlayColor: Colors.greenAccent.shade700.withOpacity(0.2),
-              trackHeight: 4,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+              activeTrackColor: tc.primary,
+              inactiveTrackColor: tc.border,
+              thumbColor: tc.primary,
+              overlayColor: tc.primary.withValues(alpha: 0.15),
+              trackHeight: 3,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
             ),
-            child: Slider(
-              value: value,
-              min: min,
-              max: max,
-              onChanged: onChanged,
-            ),
+            child: Slider(value: value, min: min, max: max, onChanged: onChanged),
           ),
         ],
       ),
@@ -442,7 +577,7 @@ class _SettingsSheetState extends State<SettingsSheet> {
   Widget _buildResetButton() {
     return SizedBox(
       width: double.infinity,
-      child: FilledButton(
+      child: OutlinedButton(
         onPressed: () {
           if (_isConfirmingReset) {
             widget.onResetToDefaults();
@@ -454,18 +589,23 @@ class _SettingsSheetState extends State<SettingsSheet> {
             });
           }
         },
-        style: FilledButton.styleFrom(
-          backgroundColor:
-              _isConfirmingReset ? Colors.redAccent : const Color(0xFF1E1E20),
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 16),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: _isConfirmingReset
+              ? const Color(0xFFFF453A)
+              : tc.textSecondary,
+          side: BorderSide(
+            color: _isConfirmingReset
+                ? const Color(0xFFFF453A).withValues(alpha: 0.5)
+                : tc.border,
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 14),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
         ),
         child: Text(
-          _isConfirmingReset ? 'Are you sure?' : 'Reset to Defaults',
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          _isConfirmingReset ? 'Tap again to confirm reset' : 'Reset to Defaults',
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
         ),
       ),
     );
